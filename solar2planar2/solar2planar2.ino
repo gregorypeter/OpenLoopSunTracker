@@ -76,18 +76,28 @@ void loop()
       //  Finding solar coordinates w.r.t. panel normal
       cart = sph2rect(coord);
 
+      cartP.x = (cos(heading) * cart.x) - (sin(heading) * cos(tilt) * cart.y) - (sin(heading) * sin(tilt) * cart.z);
+      cartP.y = (sin(heading) * cart.x) + (cos(heading) * cos(tilt) * cart.y) + (cos(heading) * sin(tilt) * cart.z);
+      cartP.z = (cos(tilt) * cart.z) - (sin(tilt) * cart.y);
+
+      /*
       cartP.x = (cos(heading) * cart.x) + (sin(heading) * cart.y);
       cartP.y = (-1)*(cos(tilt) * sin(heading) * cart.x) + (cos(tilt) * cos(heading) * cart.y) + (sin(tilt) * cart.z);
       cartP.z = (sin(tilt) * sin(heading) * cart.x) - (sin(tilt) * cos(heading) * cart.y) + (cos(tilt) * cart.z);
-
-      /*
-      cartP.x = (cos(heading) * cart.x) + (sin(heading) * cos(tilt) * cart.y) + (sin(heading) * sin(tilt) * cart.z);
-      cartP.y = (-1)*(sin(heading) * cart.x) + (cos(heading) * cos(tilt) * cart.y) + (cos(heading) * sin(tilt) * cart.z);
-      cartP.z = (cos(tilt) * cart.z) - (sin(tilt) * cart.y);
       */
 
       coordP = rect2sph(cartP);
 
+      if(coordP.az < 0)
+      {
+        coordP.az += (2*PI);
+      }
+      else if(coordP.az > (2*PI))
+      {
+        coordP.az -= (2*PI);
+      }
+      
+      /*
       if((coord.az > PI) && (coordP.az < 0))
       {
         coordP.az += (2* PI);
@@ -100,11 +110,12 @@ void loop()
       {
         coordP.az += PI;
       }
+      */
 
       //  Determining zaber stage coordinates
       zaberOld[0] = zaber[0];
       zaberOld[1] = zaber[1];
-      if((coordP.ze < 90) || (coordP.ze > 0))
+      if((coordP.ze < 90) && (coordP.ze > 0))
       {
         radius = interp1(sin(coordP.ze));
         zaber[0] = (-1) * radius * sin(coordP.az);
