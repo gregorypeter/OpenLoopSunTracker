@@ -24,10 +24,10 @@ double tilt = 0 * (PI/180);
 double radius;
 double zaberOld[2] = {0, 0};    // [x,y] for the stages (in mm)
 double zaber[2] = {0, 0};
-const long posXstart = 3880000;    //tracking the starting and current absolute positions of the stages
-const long posYstart = 1200000;
-long posX = posXstart;
-long posY = posYstart;
+const unsigned long offsetX = 3880000;    //tracking the starting and current absolute positions of the stages
+const unsigned long offsetY = 1200000;
+unsigned long posX = 0;
+unsigned long posY = 0;
 
 // Define common command numbers
 int axisX = 1;
@@ -88,10 +88,8 @@ void setup()
   delay(1000);
   rs232.println("/home");
   delay(10000);
-  comm = moveAbsX + posXstart;
-  rs232.println(comm);  
-  comm = moveAbsY + posYstart;
-  rs232.println(comm);   
+  zMove(axisX, offsetX);
+  zMove(axisY, offsetY);
 }
 
 void loop()
@@ -121,31 +119,22 @@ void loop()
   
         //  Finding solar coordinates w.r.t. panel normal
         cart = sph2rect(coord);
-  
-        cartP.x = (cos(heading) * cart.x) + (sin(heading) * cart.y);
-        cartP.y = (-1)*(cos(tilt) * sin(heading) * cart.x) + (cos(tilt) * cos(heading) * cart.y) + (sin(tilt) * cart.z);
-        cartP.z = (sin(tilt) * sin(heading) * cart.x) - (sin(tilt) * cos(heading) * cart.y) + (cos(tilt) * cart.z);
-  
-        /*
-        cartP.x = (cos(heading) * cart.x) + (sin(heading) * cos(tilt) * cart.y) + (sin(heading) * sin(tilt) * cart.z);
-        cartP.y = (-1)*(sin(heading) * cart.x) + (cos(heading) * cos(tilt) * cart.y) + (cos(heading) * sin(tilt) * cart.z);
+
+        cartP.x = (cos(heading) * cart.x) - (sin(heading) * cos(tilt) * cart.y) - (sin(heading) * sin(tilt) * cart.z);
+        cartP.y = (1)*(sin(heading) * cart.x) + (cos(heading) * cos(tilt) * cart.y) + (cos(heading) * sin(tilt) * cart.z);
         cartP.z = (cos(tilt) * cart.z) - (sin(tilt) * cart.y);
-        */
-  
+
         coordP = rect2sph(cartP);
   
-        if((coord.az > PI) && (coordP.az < 0))
+        if(coordP.az < 0)
         {
-          coordP.az += (2* PI);
+          coordP.az += (2*PI);
         }
-        else if((coord.az < PI) && (coordP.az < 0))
+        else if(coordP.az > (2*PI))
         {
-          coordP.az += PI;
+          coordP.az -= (2*PI);
         }
-        else if((coord.az > PI) && (coordP.az > 0))
-        {
-          coordP.az += PI;
-        }
+      
   
         //  Determining zaber stage coordinates
         zaberOld[0] = zaber[0];
@@ -164,36 +153,49 @@ void loop()
    
 }
 
-void zMove(int axis, String pos)
+void zMove(int axis, long pos)
 {
-  long dist = pos.toInt();
   String command;
   if(axis == 1)
   {
-    posX += dist;
+    posX = offsetX + pos;
     command = moveAbsX + posX;    
   }
   else if(axis == 2)
   {
-    posY += dist;
+    posY = pos;
     command = moveAbsY + posY;
   }  
   rs232.println(command);
 }
 
-String mm(float mmValue)
+void zMoveRel(int axis, long dist)
+{
+  String command;
+  if(axis == 1)
+  {
+    posX += dist;
+    command = moveRelX + posX;    
+  }
+  else if(axis == 2)
+  {
+    posY += dist;
+    command = moveRelY + posY;
+  }  
+  rs232.println(command);
+}
+
+long mm(float mmValue)
 {
   long dataValue;
-  dataValue = mmValue / mmResolution;
-  String dataR = String(dataValue);
+  dataValue = mmValue / mmResolution;  
   return dataR;
 } 
 
-String um(float umValue)
+long um(float umValue)
 {
   long dataValue;
-  dataValue = umValue / umResolution;
-  String dataR = String(dataValue);
+  dataValue = umValue / umResolution;  
   return dataR;
 } 
 

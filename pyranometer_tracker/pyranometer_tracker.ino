@@ -11,7 +11,7 @@ float phi;    // azimuthal angle
 float theta;  // elevation angle
 
 //    Feedback variables
-int pinPyro = 1;   //Analog pin used to read voltage from transimpedance amp
+int pinPyro = 0;   //Analog pin used to read voltage from transimpedance amp
 int voltage = 0;   //value read from transimpedance amp
 int previousVoltage = 0;  //voltage value from previous iteration
 
@@ -93,6 +93,8 @@ void setup()
 void loop()
 {
   currentMillis = millis();
+
+  //  Feed-forward tracking
   if(currentMillis - longMillis >= intervalLong)
   {
     while (gpsSerial.available() > 0)
@@ -120,14 +122,16 @@ void loop()
         sendCommand(zenith, moveAbs, theta);
       }
     }
-
-    if(currentMillis - shortMillis >= intervalShort)
-    {
-      optimize(stepsD(0.25));
-      optimize(stepsD(0.005));
-    }
   }
-   
+
+  //  Feedback tracking
+  if(currentMillis - shortMillis >= intervalShort)
+  {
+    optimize(azimuth, stepsD(0.25));
+    optimize(zenith, stepsD(0.25));
+    optimize(azimuth, stepsD(0.005));
+    optimize(zenith, stepsD(0.005));
+  }   
 }
 
 int readAnalog(int analogPin, int iterations)
@@ -241,71 +245,40 @@ void sendCommand(int device, int com, long data)
    */ 
 }
 
-void optimize(long increment)
+void optimize(int axis, long increment)
 { 
   //Get starting conditions before optimizing
   voltage = readAnalog(pinPyro, iter8); 
   
   //Move one increment in +phi and get new voltage and position
-  sendCommand(1, moveRel, increment);
+  sendCommand(axis, moveRel, increment);
   previousVoltage = voltage;
   delay(dLay);
   voltage = readAnalog(pinPyro, iter8);  
   
-  //Start optimizing along azimuthal axis
+  //Start optimizing along axis
   if(voltage > previousVoltage)         
   {
     while(voltage > previousVoltage)
     {
       previousVoltage = voltage;
-      sendCommand(1, moveRel, increment);
+      sendCommand(axis, moveRel, increment);
       delay(dLay);
       voltage = readAnalog(pinPyro, iter8); 
     }
   }
-  else if(voltage <= previousVoltage)
+  else if(voltage < previousVoltage)
   {
     previousVoltage = voltage;
-    sendCommand(1, moveRel, (-2)*increment);
+    sendCommand(axis, moveRel, (-2)*increment);
     delay(dLay);
     voltage = readAnalog(pinPyro, iter8);       
-    while(voltage >= previousVoltage)
+    while(voltage > previousVoltage)
     {        
       previousVoltage = voltage;
-      sendCommand(1, moveRel, (-1)*increment);
+      sendCommand(axis, moveRel, (-1)*increment);
       delay(dLay);
       voltage = readAnalog(pinPyro, iter8); 
     }
-  }
-
-  //Start optimizing along elevation axis
-  voltage = readAnalog(pinPyro, iter8);  
-  sendCommand(2, moveRel, increment);
-  previousVoltage = voltage;
-  delay(dLay);
-  voltage = readAnalog(pinPyro, iter8);  
-  if(voltage > previousVoltage)           
-  {
-    while(voltage > previousVoltage)
-    {
-      previousVoltage = voltage;      
-      sendCommand(2, moveRel, increment);
-      delay(dLay);
-      voltage = readAnalog(pinPyro, iter8); 
-    }
-  }
-  else if(voltage <= previousVoltage)
-  {
-    previousVoltage = voltage;
-    sendCommand(2, moveRel, (-2)*increment);
-    delay(dLay);
-    voltage = readAnalog(pinPyro, iter8); 
-    while(voltage >= previousVoltage) 
-    {
-      previousVoltage = voltage;
-      sendCommand(2, moveRel, (-1)*increment);
-      delay(dLay);
-      voltage = readAnalog(pinPyro, iter8);  
-    }
-  }    
+  }  
 }
