@@ -1,3 +1,5 @@
+#include <zaberx.h>
+
 #include <TinyGPS++.h>
 
 #include <Sun_position_algorithms.h>
@@ -39,13 +41,6 @@ int storePos = 16;    // Position can be stored in registers 0 to 15
 int returnPos = 17;   // returns the value (in microsteps) of the position stored in the indicated register
 int move2Pos = 18;    // move to the position stored in the indicated register
 int reset = 0;        // akin to toggling device power
-
-#define quad 4294967296     
-const long cubed = 16777216;
-const long squared = 65536;
-
-const float resolutionDeg = 0.000234375;
-const float resolutionRad = 0.000004091;
 
 const unsigned int intervalShort = 10000;   // Period of feedback iterations
 const unsigned int intervalLong = 60000;    // Period of feed-forward iterations
@@ -132,32 +127,6 @@ void loop()
     optimize(azimuth, stepsD(0.005));
     optimize(zenith, stepsD(0.005));
   }   
-}
-
-int readAnalog(int analogPin, int iterations)
-{
-  long volTemp = 0;
-  for(int i = 0; i < iterations; i++)
-  {
-    volTemp += analogRead(analogPin);
-  }
-  int voltage = volTemp/iterations;
-  Serial.println(voltage);
-  return voltage;
-}
-
-long stepsD(float degr)
-{
-  long stepValue;
-  stepValue = degr / resolutionDeg;
-  return stepValue;
-}
-
-long stepsR(float radis)
-{
-  long stepValue;
-  stepValue = radis / resolutionRad;
-  return stepValue;
 }
 
 void sendCommand(int device, int com, long data)
