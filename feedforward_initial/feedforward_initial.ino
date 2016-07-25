@@ -1,3 +1,13 @@
+/*   CPV Feed-forward tracking
+ *   
+ *   Michael Lipski
+ *   AOPL
+ *   Summer 2016
+ *   
+ *   Feed-forward tracking for CPV test setup.  Reads data from GPS unit, calculates position of the sun, and converts solar position to mm
+ *   displacement along X and Y of the Zaber linear stages.
+ */
+
 #include <zaberx.h>
 
 #include <TinyGPS++.h>

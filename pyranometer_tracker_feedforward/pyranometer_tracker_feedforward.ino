@@ -1,12 +1,10 @@
-/*   Dual-mode tracker for pyranometer
+/*   Pyranometer tracker using feed-forward only
  *      
  *   Michael Lipski
  *   AOPL
  *   Summer 2016
  *   
- *   Dual-mode tracking integrates feed-forward and feedback based tracking in order to control the mount for the pyranometer.
- *   Feed-forward pulls data from GPS unit, calculates solar position, then sends move commands to Zaber T-series rotational stages; operates on long period (intervalLong).
- *   Feedback attempts to maximize voltage tied to pinPyro; operates on short period (intervalShort).
+ *   Feed-forward tracking for pyranometer mount pulls data from GPS unit, calculates solar position, then sends move commands to Zaber T-series rotational stages.
  */
 
 #include <zaberx.h>
@@ -22,14 +20,6 @@
 sunpos SunPos;
 float phi;    // azimuthal angle
 float theta;  // elevation angle
-
-//    Feedback variables
-int pinPyro = 0;   //Analog pin used to read voltage from transimpedance amp
-int voltage = 0;   //value read from transimpedance amp
-int previousVoltage = 0;  //voltage value from previous iteration
-
-int dLay = 50;   //time between incremental movement and photodiode voltage read
-int iter8 = 100;   //number of reads the photodiode voltage is averaged over
 
 //    Zaber rotational stage variables
 byte command[6];
@@ -53,11 +43,9 @@ int returnPos = 17;   // returns the value (in microsteps) of the position store
 int move2Pos = 18;    // move to the position stored in the indicated register
 int reset = 0;        // akin to toggling device power
 
-const unsigned int intervalShort = 10000;   // Period of feedback iterations
 const unsigned int intervalLong = 60000;    // Period of feed-forward iterations
 
 unsigned long currentMillis = 0;
-unsigned long shortMillis = 0;
 unsigned long longMillis = 0;
 
 int GPSBaud = 4800;
@@ -129,15 +117,6 @@ void loop()
       }
     }
   }
-
-  //  Feedback tracking
-  if(currentMillis - shortMillis >= intervalShort)
-  {
-    optimize(azimuth, stepsD(0.25));
-    optimize(zenith, stepsD(0.25));
-    optimize(azimuth, stepsD(0.005));
-    optimize(zenith, stepsD(0.005));
-  }   
 }
 
 void sendCommand(int device, int com, long data)
@@ -223,42 +202,4 @@ void sendCommand(int device, int com, long data)
    Serial.print("\tData:");
    Serial.println(replyData);  
    */ 
-}
-
-void optimize(int axis, long increment)
-{ 
-  //Get starting conditions before optimizing
-  voltage = readAnalog(pinPyro, iter8); 
-  
-  //Move one increment in +phi and get new voltage and position
-  sendCommand(axis, moveRel, increment);
-  previousVoltage = voltage;
-  delay(dLay);
-  voltage = readAnalog(pinPyro, iter8);  
-  
-  //Start optimizing along axis
-  if(voltage > previousVoltage)         
-  {
-    while(voltage > previousVoltage)
-    {
-      previousVoltage = voltage;
-      sendCommand(axis, moveRel, increment);
-      delay(dLay);
-      voltage = readAnalog(pinPyro, iter8); 
-    }
-  }
-  else if(voltage < previousVoltage)
-  {
-    previousVoltage = voltage;
-    sendCommand(axis, moveRel, (-2)*increment);
-    delay(dLay);
-    voltage = readAnalog(pinPyro, iter8);       
-    while(voltage > previousVoltage)
-    {        
-      previousVoltage = voltage;
-      sendCommand(axis, moveRel, (-1)*increment);
-      delay(dLay);
-      voltage = readAnalog(pinPyro, iter8); 
-    }
-  }  
 }

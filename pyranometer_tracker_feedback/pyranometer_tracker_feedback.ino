@@ -1,27 +1,16 @@
-/*   Dual-mode tracker for pyranometer
- *      
+/*   Pyranometer tracker using feedback only   
+ *   
  *   Michael Lipski
  *   AOPL
  *   Summer 2016
  *   
- *   Dual-mode tracking integrates feed-forward and feedback based tracking in order to control the mount for the pyranometer.
- *   Feed-forward pulls data from GPS unit, calculates solar position, then sends move commands to Zaber T-series rotational stages; operates on long period (intervalLong).
- *   Feedback attempts to maximize voltage tied to pinPyro; operates on short period (intervalShort).
+ *   Uses the optimization algorithm to keep the pyranometer pointed at the sun.  Attempts to maximize voltage tied to pinPyro; moves the Zaber T-series rotational
+ *   stages in small increments while tracking the change in voltage using a "perturb and observe" style optimization approach.
  */
 
 #include <zaberx.h>
 
-#include <TinyGPS++.h>
-
-#include <Sun_position_algorithms.h>
-#include <translate.h>
-
 #include <SoftwareSerial.h>
-
-//   solar tracking variables
-sunpos SunPos;
-float phi;    // azimuthal angle
-float theta;  // elevation angle
 
 //    Feedback variables
 int pinPyro = 0;   //Analog pin used to read voltage from transimpedance amp
@@ -54,13 +43,9 @@ int move2Pos = 18;    // move to the position stored in the indicated register
 int reset = 0;        // akin to toggling device power
 
 const unsigned int intervalShort = 10000;   // Period of feedback iterations
-const unsigned int intervalLong = 60000;    // Period of feed-forward iterations
 
 unsigned long currentMillis = 0;
 unsigned long shortMillis = 0;
-unsigned long longMillis = 0;
-
-int GPSBaud = 4800;
 
 //On Mega, RX must be one of the following: pin 10-15, 50-53, A8-A15
 int RXPin = 2;
@@ -68,21 +53,12 @@ int TXPin = 3;
 int rsRX = 4;
 int rsTX = 5;
 
-// Create a TinyGPS++ object called "gps"
-TinyGPSPlus gps;
-
-// Create a software serial port called "gpsSerial"
-SoftwareSerial gpsSerial(RXPin, TXPin);  
-
 SoftwareSerial rs232(rsRX, rsTX);   //RX, TX
 
 void setup() 
 {
   //  Open serial connection with computer
   Serial.begin(9600);
-  
-  // Start the software serial port at the GPS's default baud
-  gpsSerial.begin(GPSBaud);
 
   //  Start software serial port with Zaber rotational stage
   rs232.begin(9600);
@@ -99,36 +75,6 @@ void setup()
 void loop()
 {
   currentMillis = millis();
-
-  //  Feed-forward tracking
-  if(currentMillis - longMillis >= intervalLong)
-  {
-    while (gpsSerial.available() > 0)
-    {
-      if(gps.encode(gpsSerial.read()))
-      {
-        longMillis = currentMillis;
-        SunPos.UT = gps.time.hour() + double(gps.time.minute())/60.0 + double(gps.time.second())/3600.0 + double(gps.time.centisecond())/360000; // UT in hours [decimal]
-        SunPos.Day = gps.date.day(); // day [integer]
-        SunPos.Month = gps.date.month(); // month [integer]
-        SunPos.Year = gps.date.year(); // year [integer]
-        SunPos.Dt = 96.4 + 0.567*double(gps.date.year()-2061); // Terrestial time - UT
-        SunPos.Longitude = gps.location.lng() * (2*PI/360.0); // State College Longitude and Latitude [radians]      
-        SunPos.Latitude = gps.location.lat() * (2*PI/360.0);
-        SunPos.Pressure = 1.0; // Pressure [atm]
-        //SunPos.Temperature = imu.readTempC(); // Temperature [C], pulled from LSM303C 6DOF sensor     
-        SunPos.Temperature = 20.0;
-        
-        SunPos.Algorithm5();  
-
-        theta = SunPos.Zenith * (180/PI);
-        phi = SunPos.Azimuth * (180/PI) + 180;
-
-        sendCommand(azimuth, moveAbs, phi);
-        sendCommand(zenith, moveAbs, theta);
-      }
-    }
-  }
 
   //  Feedback tracking
   if(currentMillis - shortMillis >= intervalShort)
