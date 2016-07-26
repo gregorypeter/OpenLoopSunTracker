@@ -1,29 +1,27 @@
-/*   Pyranometer tracker using feed-forward only
+/*   Test sketch for pyranometer tracker
  *      
  *   Michael Lipski
  *   AOPL
  *   Summer 2016
  *   
- *   Feed-forward tracking for pyranometer mount pulls data from GPS unit, calculates solar position, then sends move commands to Zaber T-series rotational stages.
+ *   Allows user to input azimuth and zenith angles in degrees via the serial console.  These angles get converted into microsteps and sent to the Zaber
+ *   T-series rotational stages controlling the pyranometer.
  */
 
 #include <zaberx.h>
 
-#include <TinyGPS++.h>
-
-#include <Sun_position_algorithms.h>
-#include <translate.h>
-
 #include <SoftwareSerial.h>
 
-//   solar tracking variables
-sunpos SunPos;
-float phi;    // azimuthal angle
-float theta;  // elevation angle
+#ifndef PI
+#define PI 3.14159265358979
+#endif
 
 //    Zaber rotational stage variables
 byte command[6];
 char reply[6];
+
+float phi;    // azimuthal angle
+float theta;  // elevation angle
 
 int azimuth = 1;    // Device ID of azimuth stage
 int zenith = 2;     // Device ID of elevation stage
@@ -42,6 +40,8 @@ int storePos = 16;    // Position can be stored in registers 0 to 15
 int returnPos = 17;   // returns the value (in microsteps) of the position stored in the indicated register
 int move2Pos = 18;    // move to the position stored in the indicated register
 int reset = 0;        // akin to toggling device power
+
+String comm;
 
 const unsigned int intervalLong = 60000;    // Period of feed-forward iterations
 
@@ -68,54 +68,38 @@ void setup()
 {
   //  Open serial connection with computer
   Serial.begin(9600);
-  
-  // Start the software serial port at the GPS's default baud
-  gpsSerial.begin(GPSBaud);
+  delay(200);
+  Serial.println("\tPyranometer tracker test sketch");
+  Serial.println("\tMake sure stages are homed");
+  Serial.println("--------------------------------------------------------");
 
   //  Start software serial port with Zaber rotational stage
   rs232.begin(9600);
   
   delay(1000);
   sendCommand(0, renumber, 0);
-  delay(1000);
+  delay(500);
   sendCommand(0, speedSet, 4551);   // Set speed to 10 degrees/sec
-  delay(1000);
+  delay(500);
   //sendCommand(0, homer, 0);
   //delay(5000);
+  Serial.println("Enter azimuth and zenith angles, separated by a space:");
 }
 
 void loop()
 {
-  currentMillis = millis();
-
-  //  Feed-forward tracking
-  if(currentMillis - longMillis >= intervalLong)
+  if(Serial.available() > 0)
   {
-    while (gpsSerial.available() > 0)
-    {
-      if(gps.encode(gpsSerial.read()))
-      {
-        longMillis = currentMillis;
-        SunPos.UT = gps.time.hour() + double(gps.time.minute())/60.0 + double(gps.time.second())/3600.0 + double(gps.time.centisecond())/360000; // UT in hours [decimal]
-        SunPos.Day = gps.date.day(); // day [integer]
-        SunPos.Month = gps.date.month(); // month [integer]
-        SunPos.Year = gps.date.year(); // year [integer]
-        SunPos.Dt = 96.4 + 0.567*double(gps.date.year()-2061); // Terrestial time - UT
-        SunPos.Longitude = gps.location.lng() * (2*PI/360.0); // State College Longitude and Latitude [radians]      
-        SunPos.Latitude = gps.location.lat() * (2*PI/360.0);
-        SunPos.Pressure = 1.0; // Pressure [atm]
-        //SunPos.Temperature = imu.readTempC(); // Temperature [C], pulled from LSM303C 6DOF sensor     
-        SunPos.Temperature = 20.0;
+    comm = Serial.readStringUntil(' ');       
+    phi = comm.toFloat();
+    comm = Serial.readStringUntil('\n');
+    theta = 90 - comm.toFloat();
+    Serial.print(phi);
+    Serial.print(' ');
+    Serial.println(theta);
         
-        SunPos.Algorithm5();  
-
-        theta = SunPos.Zenith;
-        phi = SunPos.Azimuth + PI;
-
-        sendCommand(azimuth, moveAbs, stepsR(phi));
-        sendCommand(zenith, moveAbs, stepsR(theta));
-      }
-    }
+    sendCommand(azimuth, moveAbs, stepsD(phi));
+    sendCommand(zenith, moveAbs, stepsD(theta));
   }
 }
 

@@ -2,7 +2,7 @@
  *   Test Sketch for indoor optics lab testing
  *   
  *   Michael Lipski
- *   AOPI
+ *   AOPL
  *   Summer 2016
  *   
  *   Allows user to input solar azimuth and zenith in degrees and calculates the displacement in mm along X and Y from the origin of the lens system.
@@ -82,7 +82,7 @@ void setup()
   Serial.println("Positioning stages...");
   //delay(15000);
   Serial.println("Ready.");
-  Serial.println("Enter azimuth and elevation, separated by a space");  
+  Serial.println("Enter azimuth and elevation, separated by a space:");  
 }
 
 void loop()
@@ -123,7 +123,11 @@ void loop()
       zaber[0] = (-1) * radius * sin(coordP.az);
       zaber[1] = (-1) * radius * cos(coordP.az);
     }
-    Serial.print("X: ");
+    Serial.print("Azimuth*: ");
+    Serial.print(coordP.az * (180/PI));
+    Serial.print("\tZenith*: ");
+    Serial.print(coordP.ze * (180/PI));
+    Serial.print("\tX: ");
     Serial.print(zaber[0]);
     Serial.print("\tY: ");
     Serial.println(zaber[1]);
