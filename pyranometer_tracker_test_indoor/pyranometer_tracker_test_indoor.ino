@@ -43,26 +43,11 @@ int reset = 0;        // akin to toggling device power
 
 String comm;
 
-const unsigned int intervalLong = 60000;    // Period of feed-forward iterations
-
-unsigned long currentMillis = 0;
-unsigned long longMillis = 0;
-
-int GPSBaud = 4800;
-
 //On Mega, RX must be one of the following: pin 10-15, 50-53, A8-A15
 int RXPin = 2;
 int TXPin = 3;
-int rsRX = 4;
-int rsTX = 5;
 
-// Create a TinyGPS++ object called "gps"
-TinyGPSPlus gps;
-
-// Create a software serial port called "gpsSerial"
-SoftwareSerial gpsSerial(RXPin, TXPin);  
-
-SoftwareSerial rs232(rsRX, rsTX);   //RX, TX
+SoftwareSerial rs232(RXPin, TXPin);   //RX, TX
 
 void setup() 
 {
@@ -100,6 +85,8 @@ void loop()
         
     sendCommand(azimuth, moveAbs, stepsD(phi));
     sendCommand(zenith, moveAbs, stepsD(theta));
+    
+    delay(1000);
   }
 }
 
