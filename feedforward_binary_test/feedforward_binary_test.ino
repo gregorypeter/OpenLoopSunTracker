@@ -9,9 +9,9 @@
  *   These mm displacement values get converted to number of microsteps and are sent as absolute move commands to the Zaber X-LRM200A linear stages.
  */
 
-#include <translate.h>
-
 #include <zaberx.h>
+
+#include <translate.h>
 
 #include <DebugMacros.h>
 #include <LSM303CTypes.h>
@@ -27,8 +27,6 @@
 int rsRX = 4;
 int rsTX = 5;
 
-const byte interrupt1 = 2;     // Uno can support external interrupts on pins 2 and 3
-
 double azimuth;
 double zenith;
 
@@ -41,26 +39,40 @@ vector cartP;
 double heading = 0 * (PI/180);
 volatile double tilt = 0 * (PI/180);
 
+const byte interrupt1 = 2;     // Uno can support external interrupts on pins 2 and 3
+
+// Variables for Zaber binary communication
+byte command[6];
+byte reply[6];
+
+float outData;
+long replyData;
+
 double radius;
 double zaber[2] = {0, 0};
+
 const unsigned long offsetX = 3880000;    //tracking the starting and current absolute positions of the stages
 const unsigned long offsetY = 1200000;
+
 unsigned long posX = 0;
 unsigned long posY = 0;
 
-// Define common command numbers
 int axisX = 1;
 int axisY = 2;
-String Home = "home";
-String MoveAbs = "move abs";
-String MoveRel = "move rel";
-String Stop = "stop";
-String SetMaxspeed = "set maxspeed";
-String GetPos = "get pos";
-String moveAbsX = "/1 move abs ";
-String moveAbsY = "/2 move abs ";
-String moveRelX = "/1 move rel ";
-String moveRelY = "/2 move rel ";
+
+// Define common command numbers
+int homer = 1;      // home the stage
+int renumber = 2;   // renumber all devices in the chain
+int moveAbs = 20;   // move absolute
+int moveRel = 21;   // move relative
+int stopMove = 23;  // Stop
+int speedSet = 42;    // Speed to target = 0.00219727(V) degrees/sec (assuming 64 microstep resolution)
+int getPos = 60;      // Query the device for its position
+int storePos = 16;    // Position can be stored in registers 0 to 15
+int returnPos = 17;   // returns the value (in microsteps) of the position stored in the indicated register
+int move2Pos = 18;    // move to the position stored in the indicated register
+int reset = 0;        // akin to toggling device power
+
 String comm;
 
 //Period of feedback iterations
@@ -82,24 +94,35 @@ void setup()
   delay(100);
   Serial.println("CPV Feed-forward test sketch");
 
+  // Enable external interrupt on pin specified by interrupt1 in order to find panel pitch
+  pinMode(interrupt1, INPUT_PULLUP);
+  attachInterrupt(digitalPinToInterrupt(interrupt1), findPitch, FALLING);
+
   //Start software serial connection with Zaber stages
-  rs232.begin(115200);
+  rs232.begin(9600);
   delay(2000);
-  rs232.println("/renumber");
-  delay(1000);
-  zMove(axisX, offsetX);
-  zMove(axisY, offsetY);
   Serial.println("Positioning stages...");
-  //delay(15000);
+  
+  /*
+  // Positioning stages to origin coinciding with lens axis of symmetry
+  posX = sendCommand(axisX, moveAbs, offsetX);
+  posY = sendCommand(axisY, moveAbs, offsetY);
+  delay(4000);
+  while((sendCommand(axisX, getPos, 0) != offsetX) && (sendCommand(axisY, getPos, 0) != offsetY))
+  {
+    delay(1000);
+  }
+  */
+  
   Serial.println("Ready.");
-  Serial.println("Enter azimuth and elevation, separated by a space:");  
+  Serial.println("Enter azimuth and zenith angles, separated by a space:");  
 }
 
 void loop()
 {
   if(Serial.available() > 0)
   {
-    //  Read azimuth and elevation from serial terminal
+    //  Read azimuth and zenith from serial terminal
     comm = Serial.readStringUntil(' ');
     azimuth = comm.toFloat();
     comm = Serial.readStringUntil('\n');
@@ -145,8 +168,8 @@ void loop()
     Serial.print(zaber[0]);
     Serial.print("\tY: ");
     Serial.println(zaber[1]);
-    //zMove(axisX, mm(zaber[0]));
-    //zMove(axisY, mm(zaber[1]));    
+    posX = sendCommand(axisX, moveAbs, mm(zaber[0]));
+    posY = sendCommand(axisY, moveAbs, mm(zaber[1]));    
   }
 }
 
@@ -162,34 +185,86 @@ void findPitch()
   tilt = atan2(accelX, sqrt((accelY * accelY) + (accelZ * accelZ)));
 }
 
-void zMove(int axis, long pos)
+long sendCommand(int device, int com, long data)
 {
-  String command;
-  if(axis == 1)
-  {
-    posX = offsetX + pos;
-    command = moveAbsX + posX;    
-  }
-  else if(axis == 2)
-  {
-    posY = pos;
-    command = moveAbsY + posY;
-  }  
-  rs232.println(command);
-}
+   unsigned long data2;
+   unsigned long temp;
+   unsigned long repData;
+   long replyNeg;
+   byte dumper[1];
+   
+   // Building the six command bytes
+   command[0] = byte(device);
+   command[1] = byte(com);
+   if(data < 0)
+   {
+     data2 = data + quad;
+   }
+   else
+   {
+     data2 = data;
+   }
+   temp = data2 / cubed;
+   command[5] = byte(temp);
+   data2 -= (cubed * temp);
+   temp = data2 / squared;
+   command[4] = byte(temp);
+   data2 -= (squared * temp);
+   temp = data2 / 256;
+   command[3] = byte(temp);
+   data2 -= (256 * data2);
+   command[2] = byte(data2);
+   
+   // Clearing serial buffer
+   while(rs232.available() > 0)
+   {
+     rs232.readBytes(dumper, 1);
+   }
+   
+   // Sending command to stage(s)
+   rs232.write(command, 6);
 
-void zMoveRel(int axis, long dist)
-{
-  String command;
-  if(axis == 1)
-  {
-    posX += dist;
-    command = moveRelX + posX;    
-  }
-  else if(axis == 2)
-  {
-    posY += dist;
-    command = moveRelY + posY;
-  }  
-  rs232.println(command);
+   delay(20);
+   
+   // Reading device reply
+   if(rs232.available() > 0)
+   {
+     rs232.readBytes(reply, 6);
+   }
+   
+   repData = (cubed * reply[5]) + (squared * reply[4]) + (256 * reply[3]) + reply[2];
+
+   if(reply[4] == 1)
+   {
+     repData += 65536;
+   }
+   
+   if(reply[5] > 127)
+   {
+     replyNeg = repData - quad;
+   }
+   
+   // Printing full reply bytes as well as reply data in decimal 
+   Serial.print(reply[0]);
+   Serial.print(' ');
+   Serial.print(reply[1]);
+   Serial.print(' ');
+   Serial.print(reply[2]);
+   Serial.print(' ');
+   Serial.print(reply[3]);
+   Serial.print(' ');
+   Serial.print(reply[4]);
+   Serial.print(' ');
+   Serial.println(reply[5]);
+   Serial.print("\tData:");
+   if(reply[5] > 127)
+   {
+     Serial.println(replyNeg);
+     return replyNeg;
+   }
+   else
+   {
+     Serial.println(repData);  
+     return repData;
+   }    
 }
