@@ -22,13 +22,21 @@
 
 #include <SoftwareSerial.h>
 
-//GPS uses software serial by default, with RX = pin 2 and TX = pin 3.  Mega 2560 does not support software serial RX on pin 2, so add a jumper wire from pin 2 on GPS shield to RX pin used
+// GPS uses software serial by default, with RX = pin 2 and TX = pin 3.  Mega 2560 does not support software serial RX on pin 2, so add a jumper wire from pin 2 on GPS shield to RX pin used
 int RXPin = 2;
 int TXPin = 3;
 int rsRX = 4;
 int rsTX = 5;
 
+// Variables involved in finding the panel pitch from 3-axis accelerometer readings
 const byte interrupt1 = 2;     // Uno can support external interrupts on pins 2 and 3
+volatile boolean setPitch = false;   // boolean for setting panel tilt by reading accelerometer data; off by default
+int averaging = 100;
+
+// Acceleration components from 3-axis accelerometer
+double accelX;
+double accelY;
+double accelZ;
 
 sunpos SunPos;
 polar coord; // zenith and azimuth in a struct
@@ -36,7 +44,7 @@ polar coordP;
 vector cart;
 vector cartP;
 
-//Enter array tilt and heading
+// Enter array tilt and heading
 double heading = 180 * (PI/180);
 volatile double tilt = 0 * (PI/180);
 
@@ -164,18 +172,33 @@ void loop()
       }
     }
   }   
+
+  if(setPitch == true)
+  {
+    accelX = 0;
+    accelY = 0;
+    accelZ = 0;
+
+    for(int i = 0; i < averaging; i++)
+    {
+      accelX += imu.readAccelX();
+      accelY += imu.readAccelY();
+      accelZ += imu.readAccelZ();
+    }
+    
+    accelX /= averaging;
+    accelY /= averaging;
+    accelZ /= averaging;
+    
+    tilt = atan2(accelX, sqrt((accelY * accelY) + (accelZ * accelZ)));
+    
+    setPitch = false;
+  }
 }
 
 void findPitch()
 {
-  double accelX;
-  double accelY;
-  double accelZ;
-
-  accelX = imu.readAccelX();
-  accelY = imu.readAccelY();
-  accelZ = imu.readAccelZ();
-  tilt = atan2(accelX, sqrt((accelY * accelY) + (accelZ * accelZ)));
+  setPitch = true;
 }
 
 void zMove(int axis, long pos)

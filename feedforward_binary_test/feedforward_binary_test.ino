@@ -39,7 +39,15 @@ vector cartP;
 double heading = 0 * (PI/180);
 volatile double tilt = 0 * (PI/180);
 
+// Variables involved in finding the panel pitch from 3-axis accelerometer readings
 const byte interrupt1 = 2;     // Uno can support external interrupts on pins 2 and 3
+volatile boolean setPitch = false;   // boolean for setting panel tilt by reading accelerometer data; off by default
+int averaging = 100;
+
+// Acceleration components from 3-axis accelerometer
+double accelX;
+double accelY;
+double accelZ;
 
 // Variables for Zaber binary communication
 byte command[6];
@@ -171,18 +179,33 @@ void loop()
     posX = sendCommand(axisX, moveAbs, mm(zaber[0]));
     posY = sendCommand(axisY, moveAbs, mm(zaber[1]));    
   }
+
+  if(setPitch == true)
+  {
+    accelX = 0;
+    accelY = 0;
+    accelZ = 0;
+
+    for(int i = 0; i < averaging; i++)
+    {
+      accelX += imu.readAccelX();
+      accelY += imu.readAccelY();
+      accelZ += imu.readAccelZ();
+    }
+    
+    accelX /= averaging;
+    accelY /= averaging;
+    accelZ /= averaging;
+    
+    tilt = atan2(accelX, sqrt((accelY * accelY) + (accelZ * accelZ)));
+    
+    setPitch = false;
+  }
 }
 
 void findPitch()
 {
-  double accelX;
-  double accelY;
-  double accelZ;
-
-  accelX = imu.readAccelX();
-  accelY = imu.readAccelY();
-  accelZ = imu.readAccelZ();
-  tilt = atan2(accelX, sqrt((accelY * accelY) + (accelZ * accelZ)));
+  setPitch = true;
 }
 
 long sendCommand(int device, int com, long data)
