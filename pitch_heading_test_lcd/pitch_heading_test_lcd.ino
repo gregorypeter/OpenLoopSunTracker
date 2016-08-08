@@ -1,13 +1,14 @@
 /*   LSM303C 6DOF IMU (6 Degree-of-freedom inertial measurement unit) Test Sketch
+ *    Using Hitachi HD44780 chipset LCD screen
  *      
  *   Michael Lipski
  *   AOPL
  *   Summer 2016
  *   
  *   Reads X, Y, and Z components of acceleration and magnetic field and, assuming the board is stationary and is subject to only the earth's magnetic
- *   field, determines the pitch and heading of the board.    
+ *   field, determines the pitch and heading of the board.  Outputs data to LCD screen instead of serial monitor.
  */
-
+#include <LiquidCrystal.h>
 
 #include <DebugMacros.h>
 #include <LSM303CTypes.h>
@@ -30,12 +31,15 @@ double heading = 0;
 
 int iter8 = 50;
 
-//Create an object to control LSM303C 6DOF IMU
-LSM303C imu;            // Uno: A4 is SDA, A5 is SCL
+// Create an object to control LCD
+LiquidCrystal lcd(8, 9, 10, 11, 12, 13);      // (RS, enable, D4, D5, D6, D7); R/W tied to ground for write only
+
+// Create an object to control LSM303C 6DOF IMU
+LSM303C imu;                // Uno: A4 is SDA, A5 is SCL
 
 void setup() 
 {
-  Serial.begin(9600);
+  lcd.begin(16, 2);    // (characters per line, # of lines);
   delay(1000);
 }
 
@@ -81,10 +85,10 @@ void loop()
 
   heading = (-atan2(yHor , xHor) * (180/PI)) + 180;
 
-  Serial.print("Pitch:");
-  Serial.print(pitch * (180/PI));
-  Serial.print("\tRoll:");
-  Serial.print(roll * (180/PI));
-  Serial.print("\tHeading:");
-  Serial.println(heading);  
+  lcd.clear();
+  lcd.print(" P: ");
+  lcd.print(pitch);
+  lcd.setCursor(0, 1);
+  lcd.print(" H: ");
+  lcd.print(heading);
 }
