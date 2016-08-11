@@ -15,9 +15,11 @@
 #include <SparkFunIMU.h>
 #include <SparkFunLSM303C.h>
 
-double accelX = 0;  //accelerometer components
-double accelY = 0;  
-double accelZ = 0;  
+const int iter8 = 50;
+
+double accelX;  //accelerometer components
+double accelY;  
+double accelZ;  
 
 double magX = 0;  //magnetic field strength in x direction
 double magY = 0;  //magnetic field strength in y direction
@@ -29,8 +31,6 @@ double pitch = 0;   //calculated values of pitch, roll, and yaw
 double roll = 0;
 double heading = 0;
 
-int iter8 = 50;
-
 // Create an object to control LCD
 LiquidCrystal lcd(8, 9, 10, 11, 12, 13);      // (RS, enable, D4, D5, D6, D7); R/W tied to ground for write only
 
@@ -40,45 +40,53 @@ LSM303C imu;                // Uno: A4 is SDA, A5 is SCL
 void setup() 
 {
   lcd.begin(16, 2);    // (characters per line, # of lines);
+  if (imu.begin() != IMU_SUCCESS)
+  {
+    lcd.clear();
+    lcd.setCursor(0, 0);
+    lcd.print("Failed setup.");
+    while(1);
+  }
   delay(1000);
 }
 
 void loop() 
 {
   //Determining tilt from accelerometer readings
+  /*
+  accelX = imu.readAccelX();
+  accelY = imu.readAccelY();
+  accelZ = imu.readAccelZ();
+  */  
+  
   accelX = 0;
   accelY = 0;
   accelZ = 0;
-
-  for(int i = 0; i < iter8; i++)
-  {
-    accelX += imu.readAccelX();
-    accelY += imu.readAccelY();
-    accelZ += imu.readAccelZ();
-  }
-
-  accelX /= iter8;
-  accelY /= iter8;
-  accelZ /= iter8;
-
-  pitch = atan2(accelX , sqrt(pow(accelY , 2) + pow(accelZ , 2)));
-  roll = atan2(accelY , sqrt(pow(accelX, 2) + pow(accelZ, 2)));
-  
-  //Determining heading from X & Y magnetometer readings
   magX = 0;
   magY = 0;
   magZ = 0;
 
   for(int i = 0; i < iter8; i++)
   {
+    accelX += imu.readAccelX();
+    accelY += imu.readAccelY();
+    accelZ += imu.readAccelZ();
     magX += imu.readMagX();
     magY += imu.readMagY();
     magZ += imu.readMagZ();
+    
+    delay(9);
   }
 
+  accelX /= iter8;
+  accelY /= iter8;
+  accelZ /= iter8;
   magX /= iter8;
   magY /= iter8;
-  magZ /= iter8;
+  magZ /= iter8;  
+
+  pitch = atan2(accelX , sqrt((accelY * accelY) + (accelZ * accelZ)));
+  roll = atan2(accelY , sqrt((accelX * accelX) + (accelZ * accelZ)));
 
   yHor = magY*cos(roll) + magZ*sin(roll);
   xHor = magX*cos(pitch) + magZ*sin(pitch)*sin(roll) + magZ*sin(pitch)*cos(roll);
@@ -86,9 +94,15 @@ void loop()
   heading = (-atan2(yHor , xHor) * (180/PI)) + 180;
 
   lcd.clear();
-  lcd.print(" P: ");
-  lcd.print(pitch);
+  lcd.setCursor(0, 0);
+  lcd.print("P:");
+  lcd.print(pitch * (180/PI));
+  lcd.setCursor(8, 0);
+  lcd.print("R:");
+  lcd.print(roll * (180/PI));
   lcd.setCursor(0, 1);
   lcd.print(" H: ");
   lcd.print(heading);
+
+  delay(100);
 }
