@@ -60,8 +60,8 @@ long replyData;
 double radius;
 double zaber[2] = {0, 0};
 
-const unsigned long offsetX = 3880000;    //tracking the starting and current absolute positions of the stages
-const unsigned long offsetY = 1200000;
+const unsigned long offsetX = 2148185;    //tracking the starting and current absolute positions of the stages
+const unsigned long offsetY = 2104209;
 
 unsigned long posX = 0;
 unsigned long posY = 0;

@@ -61,8 +61,8 @@ long replyData;
 double radius;    
 double zaber[2] = {0, 0};   // [x,y] for the stages (in mm)
 
-const unsigned long offsetX = 3880000;    //tracking the starting and current absolute positions of the stages
-const unsigned long offsetY = 1200000;
+const unsigned long offsetX = 2148185;    //tracking the starting and current absolute positions of the stages
+const unsigned long offsetY = 2104209;
 
 unsigned long posX = 0;
 unsigned long posY = 0;
@@ -182,8 +182,8 @@ void loop()
           zaber[0] = (-1) * radius * sin(coordP.az);
           zaber[1] = (-1) * radius * cos(coordP.az);
         }
-        posX = sendCommand(axisX, moveAbs, mm(zaber[0]));
-        posY = sendCommand(axisY, moveAbs, mm(zaber[1]));
+        posX = sendCommand(axisX, moveAbs, mm(zaber[0]) + offsetX);
+        posY = sendCommand(axisY, moveAbs, mm(zaber[1]) + offsetY);
       }
     }
   } 

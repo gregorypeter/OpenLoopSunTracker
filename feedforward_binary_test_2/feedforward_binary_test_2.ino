@@ -25,8 +25,8 @@
 #define PI 3.14159265358979
 #endif
 
-int rsRX = 4;
-int rsTX = 5;
+int rsRX = 2;
+int rsTX = 3;
 
 double azimuth;
 double zenith;
@@ -60,8 +60,8 @@ long replyData;
 double radius;
 double zaber[2] = {0, 0};
 
-const unsigned long offsetX = 3880000;    //tracking the starting and current absolute positions of the stages
-const unsigned long offsetY = 1200000;
+const unsigned long offsetX = 2148185;    //tracking the starting and current absolute positions of the stages
+const unsigned long offsetY = 2104209;
 
 unsigned long posX = 0;
 unsigned long posY = 0;
@@ -103,9 +103,11 @@ void setup()
   delay(100);
   Serial.println("CPV Feed-forward test sketch");
 
+  /*
   // Enable external interrupt on pin specified by interrupt1 in order to find panel pitch
   pinMode(interrupt1, INPUT_PULLUP);
   attachInterrupt(digitalPinToInterrupt(interrupt1), findPitch, FALLING);
+  */
 
   //Start software serial connection with Zaber stages
   rs232.begin(9600);
@@ -159,7 +161,7 @@ void loop()
     }
     
     //  Determining zaber stage coordinates   
-    if((coordP.ze < 90) && (coordP.ze > 0))
+    if((coordP.ze < (PI/2)) && (coordP.ze > (-PI/8)))
     {
       radius = interp2(sin(coordP.ze));
       zaber[0] = (-1) * radius * sin(coordP.az);
@@ -177,8 +179,8 @@ void loop()
     Serial.print(zaber[0]);
     Serial.print("\tY: ");
     Serial.println(zaber[1]);
-    posX = sendCommand(axisX, moveAbs, mm(zaber[0]));
-    posY = sendCommand(axisY, moveAbs, mm(zaber[1]));    
+    posX = sendCommand(axisX, moveAbs, mm(zaber[0]) + offsetX);
+    posY = sendCommand(axisY, moveAbs, mm(zaber[1]) + offsetY);    
   }
 
   if(setPitch == true)
