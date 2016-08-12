@@ -102,6 +102,15 @@ void setup()
   delay(100);
   Serial.println("CPV Feed-forward test sketch");
 
+  /*
+  // Initializing LSM303C 6DOF IMU
+  if (imu.begin() != IMU_SUCCESS)
+  {
+    Serial.println("Failed setup.");
+    while(1);
+  }
+  */
+
   // Enable external interrupt on pin specified by interrupt1 in order to find panel pitch
   pinMode(interrupt1, INPUT_PULLUP);
   attachInterrupt(digitalPinToInterrupt(interrupt1), findPitch, FALLING);
@@ -176,8 +185,8 @@ void loop()
     Serial.print(zaber[0]);
     Serial.print("\tY: ");
     Serial.println(zaber[1]);
-    posX = sendCommand(axisX, moveAbs, mm(zaber[0]));
-    posY = sendCommand(axisY, moveAbs, mm(zaber[1]));    
+    posX = sendCommand(axisX, moveAbs, mm(zaber[0]) + offsetX);
+    posY = sendCommand(axisY, moveAbs, mm(zaber[1]) + offsetY);    
   }
 
   if(setPitch == true)
@@ -279,7 +288,7 @@ long sendCommand(int device, int com, long data)
    Serial.print(reply[4]);
    Serial.print(' ');
    Serial.println(reply[5]);
-   Serial.print("\tData:");
+   Serial.print("\tData: ");
    if(reply[5] > 127)
    {
      Serial.println(replyNeg);

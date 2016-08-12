@@ -138,7 +138,7 @@ void loop()
   xHor = magX*cos(pitch) + magZ*sin(pitch)*sin(roll) + magZ*sin(pitch)*cos(roll);
 
   heading = (-atan2(yHor , xHor) * (180/PI)) + 180;
-
+  
   /*
   Serial.print("X: ");
   Serial.print(magX);
