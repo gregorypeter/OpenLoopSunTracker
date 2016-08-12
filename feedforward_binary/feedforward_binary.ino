@@ -1,5 +1,6 @@
 /*   CPV Feed-forward tracking
  *    Using Zaber Binary protocol
+ *    Using f20 lens data
  *   
  *   Michael Lipski
  *   AOPL

@@ -1,6 +1,6 @@
 /*   CPV Feed-forward tracking
  *   Test Sketch for indoor optics lab testing
- *   Using f20 lens data
+ *   Using f80 lens data
  *   
  *   Michael Lipski
  *   AOPL
@@ -103,15 +103,6 @@ void setup()
   delay(100);
   Serial.println("CPV Feed-forward test sketch");
 
-  /*
-  // Initializing LSM303C 6DOF IMU
-  if (imu.begin() != IMU_SUCCESS)
-  {
-    Serial.println("Failed setup.");
-    while(1);
-  }
-  */
-
   // Enable external interrupt on pin specified by interrupt1 in order to find panel pitch
   pinMode(interrupt1, INPUT_PULLUP);
   attachInterrupt(digitalPinToInterrupt(interrupt1), findPitch, FALLING);
@@ -170,7 +161,7 @@ void loop()
     //  Determining zaber stage coordinates   
     if((coordP.ze < 90) && (coordP.ze > 0))
     {
-      radius = interp1(sin(coordP.ze));
+      radius = interp2(sin(coordP.ze));
       zaber[0] = (-1) * radius * sin(coordP.az);
       zaber[1] = (-1) * radius * cos(coordP.az);
     }
@@ -186,8 +177,8 @@ void loop()
     Serial.print(zaber[0]);
     Serial.print("\tY: ");
     Serial.println(zaber[1]);
-    posX = sendCommand(axisX, moveAbs, mm(zaber[0]) + offsetX);
-    posY = sendCommand(axisY, moveAbs, mm(zaber[1]) + offsetY);    
+    posX = sendCommand(axisX, moveAbs, mm(zaber[0]));
+    posY = sendCommand(axisY, moveAbs, mm(zaber[1]));    
   }
 
   if(setPitch == true)
@@ -289,7 +280,7 @@ long sendCommand(int device, int com, long data)
    Serial.print(reply[4]);
    Serial.print(' ');
    Serial.println(reply[5]);
-   Serial.print("\tData: ");
+   Serial.print("\tData:");
    if(reply[5] > 127)
    {
      Serial.println(replyNeg);

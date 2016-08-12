@@ -1,44 +1,34 @@
 /*   CPV Feed-forward tracking
- *   Test Sketch for indoor optics lab testing
- *   Using f20 lens data
+ *    Using Zaber Binary protocol
+ *    Using f80 lens data
  *   
  *   Michael Lipski
  *   AOPL
  *   Summer 2016
  *   
- *   Allows user to input solar azimuth and zenith in degrees and calculates the displacement in mm along X and Y from the origin of the lens system.
- *   These mm displacement values get converted to number of microsteps and are sent as absolute move commands to the Zaber X-LRM200A linear stages.
+ *   Feed-forward tracking for CPV test setup.  Reads data from GPS unit, calculates position of the sun, and converts solar position to mm
+ *   displacement along X and Y of the Zaber linear stages.
  */
 
 #include <zaberx.h>
 
-#include <translate.h>
+#include <TinyGPS++.h>
 
 #include <DebugMacros.h>
 #include <LSM303CTypes.h>
 #include <SparkFunIMU.h>
 #include <SparkFunLSM303C.h>
 
+#include <Sun_position_algorithms.h>
+#include <translate.h>
+
 #include <SoftwareSerial.h>
 
-#ifndef PI
-#define PI 3.14159265358979
-#endif
-
-int rsRX = 4;
-int rsTX = 5;
-
-double azimuth;
-double zenith;
-
-polar coord; // zenith and azimuth in a struct
-polar coordP;
-vector cart;
-vector cartP;
-
-//Enter array tilt and heading
-double heading = 0 * (PI/180);
-volatile double tilt = 0 * (PI/180);
+// GPS uses software serial by default, with RX = pin 2 and TX = pin 3.  Mega 2560 does not support software serial RX on pin 2, so add a jumper wire from pin 2 on GPS shield to RX pin used
+const int RXPin = 2;
+const int TXPin = 3;
+const int rsRX = 4;
+const int rsTX = 5;
 
 // Variables involved in finding the panel pitch from 3-axis accelerometer readings
 const byte interrupt1 = 2;     // Uno can support external interrupts on pins 2 and 3
@@ -50,6 +40,17 @@ double accelX;
 double accelY;
 double accelZ;
 
+// Variables for solar position calculations
+sunpos SunPos;
+polar coord; // zenith and azimuth in a struct
+polar coordP;
+vector cart;
+vector cartP;
+
+// Enter array tilt and heading
+double heading = 180 * (PI/180);
+volatile double tilt = 0 * (PI/180);
+
 // Variables for Zaber binary communication
 byte command[6];
 byte reply[6];
@@ -57,8 +58,8 @@ byte reply[6];
 float outData;
 long replyData;
 
-double radius;
-double zaber[2] = {0, 0};
+double radius;    
+double zaber[2] = {0, 0};   // [x,y] for the stages (in mm)
 
 const unsigned long offsetX = 3880000;    //tracking the starting and current absolute positions of the stages
 const unsigned long offsetY = 1200000;
@@ -82,16 +83,22 @@ int returnPos = 17;   // returns the value (in microsteps) of the position store
 int move2Pos = 18;    // move to the position stored in the indicated register
 int reset = 0;        // akin to toggling device power
 
-String comm;
-
-//Period of feedback iterations
+// Period of feedback iterations
 const int interval = 5000;
 
 unsigned long previousMillis = 0;
 unsigned long currentMillis = 0;
 
+int GPSBaud = 4800;
+
+// Create a TinyGPS++ object called "gps"
+TinyGPSPlus gps;
+
 //Create an object for the 6DOF IMU
 LSM303C imu;
+
+// Create a software serial port called "gpsSerial"
+SoftwareSerial gpsSerial(RXPin, TXPin);  
 
 // Create a software serial port to communicate with the Zaber stages
 SoftwareSerial rs232(rsRX, rsTX);   
@@ -100,27 +107,18 @@ void setup()
 {
   // Start the Arduino hardware serial port at 9600 baud
   Serial.begin(9600);
-  delay(100);
-  Serial.println("CPV Feed-forward test sketch");
-
-  /*
-  // Initializing LSM303C 6DOF IMU
-  if (imu.begin() != IMU_SUCCESS)
-  {
-    Serial.println("Failed setup.");
-    while(1);
-  }
-  */
 
   // Enable external interrupt on pin specified by interrupt1 in order to find panel pitch
   pinMode(interrupt1, INPUT_PULLUP);
   attachInterrupt(digitalPinToInterrupt(interrupt1), findPitch, FALLING);
 
+  // Start the software serial port at the GPS's default baud
+  gpsSerial.begin(GPSBaud);
+
   //Start software serial connection with Zaber stages
   rs232.begin(9600);
   delay(2000);
-  Serial.println("Positioning stages...");
-  
+
   /*
   // Positioning stages to origin coinciding with lens axis of symmetry
   posX = sendCommand(axisX, moveAbs, offsetX);
@@ -131,64 +129,64 @@ void setup()
     delay(1000);
   }
   */
-  
-  Serial.println("Ready.");
-  Serial.println("Enter azimuth and zenith angles, separated by a space:");  
 }
 
 void loop()
 {
-  if(Serial.available() > 0)
+  currentMillis = millis();
+  if(currentMillis - previousMillis >= interval)
   {
-    //  Read azimuth and zenith from serial terminal
-    comm = Serial.readStringUntil(' ');
-    azimuth = comm.toFloat();
-    comm = Serial.readStringUntil('\n');
-    zenith = comm.toFloat();
-    
-    coord.az = azimuth * (PI/180);
-    coord.ze = zenith * (PI/180);
-    
-    //  Finding solar coordinates w.r.t. panel normal
-    cart = sph2rect(coord);
+    while (gpsSerial.available() > 0)
+    {
+      if(gps.encode(gpsSerial.read()))
+      {
+        SunPos.UT = gps.time.hour() + double(gps.time.minute())/60.0 + double(gps.time.second())/3600.0 + double(gps.time.centisecond())/360000; // UT in hours [decimal]
+        SunPos.Day = gps.date.day(); // day [integer]
+        SunPos.Month = gps.date.month(); // month [integer]
+        SunPos.Year = gps.date.year(); // year [integer]
+        SunPos.Dt = 96.4 + 0.567*double(gps.date.year()-2061); // Terrestial time - UT
+        SunPos.Longitude = gps.location.lng() * (2*PI/360.0); // State College Longitude and Latitude [radians]      
+        SunPos.Latitude = gps.location.lat() * (2*PI/360.0);
+        SunPos.Pressure = 1.0; // Pressure [atm]
+        //SunPos.Temperature = imu.readTempC(); // Temperature [C], pulled from LSM303C 6DOF sensor     
+        SunPos.Temperature = 20.0;
+        
+        SunPos.Algorithm5();
+  
+        coord.ze = SunPos.Zenith;
+        coord.az = SunPos.Azimuth + PI;
+  
+        //  Finding solar coordinates w.r.t. panel normal
+        cart = sph2rect(coord);
 
-    cartP.x = (cos(heading) * cart.x) - (sin(heading) * cos(tilt) * cart.y) - (sin(heading) * sin(tilt) * cart.z);
-    cartP.y = (1)*(sin(heading) * cart.x) + (cos(heading) * cos(tilt) * cart.y) + (cos(heading) * sin(tilt) * cart.z);
-    cartP.z = (cos(tilt) * cart.z) - (sin(tilt) * cart.y);
+        cartP.x = (cos(heading) * cart.x) - (sin(heading) * cos(tilt) * cart.y) - (sin(heading) * sin(tilt) * cart.z);
+        cartP.y = (1)*(sin(heading) * cart.x) + (cos(heading) * cos(tilt) * cart.y) + (cos(heading) * sin(tilt) * cart.z);
+        cartP.z = (cos(tilt) * cart.z) - (sin(tilt) * cart.y);
 
-    coordP = rect2sph(cartP);
-    
-    if(coordP.az < 0)
-    {
-      coordP.az += (2*PI);
+        coordP = rect2sph(cartP);
+  
+        if(coordP.az < 0)
+        {
+          coordP.az += (2*PI);
+        }
+        else if(coordP.az > (2*PI))
+        {
+          coordP.az -= (2*PI);
+        }
+      
+  
+        //  Determining zaber stage coordinates
+        if((coordP.ze < 90) && (coordP.ze > 0))
+        {
+          radius = interp2(sin(coordP.ze));
+          zaber[0] = (-1) * radius * sin(coordP.az);
+          zaber[1] = (-1) * radius * cos(coordP.az);
+        }
+        posX = sendCommand(axisX, moveAbs, mm(zaber[0]));
+        posY = sendCommand(axisY, moveAbs, mm(zaber[1]));
+      }
     }
-    else if(coordP.az > (2*PI))
-    {
-      coordP.az -= (2*PI);
-    }
-    
-    //  Determining zaber stage coordinates   
-    if((coordP.ze < 90) && (coordP.ze > 0))
-    {
-      radius = interp1(sin(coordP.ze));
-      zaber[0] = (-1) * radius * sin(coordP.az);
-      zaber[1] = (-1) * radius * cos(coordP.az);
-    }
-    Serial.print("Azimuth: ");
-    Serial.print(azimuth);
-    Serial.print("\tZenith: ");
-    Serial.print(zenith);
-    Serial.print("\tAzimuth*: ");
-    Serial.print(coordP.az * (180/PI));
-    Serial.print("\tZenith*: ");
-    Serial.print(coordP.ze * (180/PI));
-    Serial.print("\tX: ");
-    Serial.print(zaber[0]);
-    Serial.print("\tY: ");
-    Serial.println(zaber[1]);
-    posX = sendCommand(axisX, moveAbs, mm(zaber[0]) + offsetX);
-    posY = sendCommand(axisY, moveAbs, mm(zaber[1]) + offsetY);    
-  }
+  } 
 
   if(setPitch == true)
   {
@@ -289,7 +287,7 @@ long sendCommand(int device, int com, long data)
    Serial.print(reply[4]);
    Serial.print(' ');
    Serial.println(reply[5]);
-   Serial.print("\tData: ");
+   Serial.print("\tData:");
    if(reply[5] > 127)
    {
      Serial.println(replyNeg);
@@ -301,3 +299,4 @@ long sendCommand(int device, int com, long data)
      return repData;
    }    
 }
+
