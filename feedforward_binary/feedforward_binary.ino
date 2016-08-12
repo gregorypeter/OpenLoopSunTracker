@@ -49,7 +49,7 @@ vector cartP;
 
 // Enter array tilt and heading
 double heading = 180 * (PI/180);
-volatile double tilt = 0 * (PI/180);
+double tilt = 0 * (PI/180);
 
 // Variables for Zaber binary communication
 byte command[6];
@@ -199,6 +199,8 @@ void loop()
       accelX += imu.readAccelX();
       accelY += imu.readAccelY();
       accelZ += imu.readAccelZ();
+
+      delay(10);
     }
     
     accelX /= averaging;

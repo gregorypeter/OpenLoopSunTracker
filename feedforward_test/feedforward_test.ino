@@ -47,7 +47,7 @@ vector cartP;
 
 //Enter array tilt and heading
 double heading = 0 * (PI/180);
-volatile double tilt = 0 * (PI/180);
+double tilt = 0 * (PI/180);
 
 double radius;
 double zaber[2] = {0, 0};
@@ -135,12 +135,10 @@ void loop()
     }
     
     //  Determining zaber stage coordinates   
-    if((coordP.ze < 90) && (coordP.ze > 0))
-    {
-      radius = interp1(sin(coordP.ze));
-      zaber[0] = (-1) * radius * sin(coordP.az);
-      zaber[1] = (-1) * radius * cos(coordP.az);
-    }
+    radius = interp1(sin(coordP.ze));
+    zaber[0] = (-1) * radius * sin(coordP.az);
+    zaber[1] = (-1) * radius * cos(coordP.az);
+    
     Serial.print("Azimuth: ");
     Serial.print(azimuth);
     Serial.print("\tZenith: ");
@@ -168,6 +166,8 @@ void loop()
       accelX += imu.readAccelX();
       accelY += imu.readAccelY();
       accelZ += imu.readAccelZ();
+
+      delay(10);
     }
     
     accelX /= averaging;

@@ -38,7 +38,7 @@ vector cartP;
 
 //Enter array tilt and heading
 double heading = 0 * (PI/180);
-volatile double tilt = 0 * (PI/180);
+double tilt = 0 * (PI/180);
 
 // Variables involved in finding the panel pitch from 3-axis accelerometer readings
 const byte interrupt1 = 2;     // Uno can support external interrupts on pins 2 and 3
@@ -160,13 +160,11 @@ void loop()
       coordP.az -= (2*PI);
     }
     
-    //  Determining zaber stage coordinates   
-    if((coordP.ze < (PI/2)) && (coordP.ze > (-PI/8)))
-    {
-      radius = interp2(sin(coordP.ze));
-      zaber[0] = (-1) * radius * sin(coordP.az);
-      zaber[1] = (-1) * radius * cos(coordP.az);
-    }
+    //  Determining zaber stage coordinates     
+    radius = interp2(sin(coordP.ze));
+    zaber[0] = (-1) * radius * sin(coordP.az);
+    zaber[1] = (-1) * radius * cos(coordP.az);
+    
     Serial.print("Azimuth: ");
     Serial.print(azimuth);
     Serial.print("\tZenith: ");
@@ -194,6 +192,8 @@ void loop()
       accelX += imu.readAccelX();
       accelY += imu.readAccelY();
       accelZ += imu.readAccelZ();
+
+      delay(10);
     }
     
     accelX /= averaging;
