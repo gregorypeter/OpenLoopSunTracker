@@ -1,3 +1,14 @@
+/*   Sample code for testing the conversion from solar coordinates to planar coordinates in the array of the concentrator cell
+ *    Using f20 lens data
+ * 
+ *   Michael Lipski
+ *   AOPL
+ *   Summer 2016
+ * 
+ *   Gets data from GPS, calculates solar position, then transforms local horizontal solar coordinates into XY coordinates
+ *   in the plane of the concentrator.
+ */
+
 #include <TinyGPS++.h>
 
 #include <Sun_position_algorithms.h>
