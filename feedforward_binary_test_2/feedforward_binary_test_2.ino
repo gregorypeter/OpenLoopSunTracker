@@ -108,6 +108,16 @@ void setup()
   pinMode(interrupt1, INPUT_PULLUP);
   attachInterrupt(digitalPinToInterrupt(interrupt1), findPitch, FALLING);
   */
+  
+  // Sets the stages to use binary protocol
+  rs232.begin(115200);
+  delay(1000);  
+  rs232.println("/tools setcomm 9600 1");
+  delay(500);
+  Serial.println(rs232.readStringUntil('\n'));
+  delay(100);
+  rs232.end();
+  delay(200);
 
   //Start software serial connection with Zaber stages
   rs232.begin(9600);
