@@ -1,6 +1,6 @@
 /*   CPV Feed-forward tracking
  *   Test Sketch for indoor optics lab testing
- *   Using f20 lens data
+ *   Using new lens data
  *   
  *   Michael Lipski
  *   AOPL
@@ -25,8 +25,7 @@
 #define PI 3.14159265358979
 #endif
 
-int rsRX = 4;
-int rsTX = 5;
+////////////////////////////////// COMPUTATION VARIABLES ////////////////////////////////////////////////////////////////////////
 
 double azimuth;
 double zenith;
@@ -40,25 +39,31 @@ vector cartP;
 double heading = 0 * (PI/180);
 double tilt = 0 * (PI/180);
 
+double radius;
+double zaber[2] = {0, 0};
+
+/*
 // Variables involved in finding the panel pitch from 3-axis accelerometer readings
 const byte interrupt1 = 2;     // Uno can support external interrupts on pins 2 and 3
 volatile boolean setPitch = false;   // boolean for setting panel tilt by reading accelerometer data; off by default
 int averaging = 100;
+*/
 
 // Acceleration components from 3-axis accelerometer
 double accelX;
 double accelY;
 double accelZ;
 
-// Variables for Zaber binary communication
+////////////////////////////// ZABER STAGE VARIABLES /////////////////////////////////////////////////////////////////////////
+
+int rsRX = 10;
+int rsTX = 3;
+
 byte command[6];
 byte reply[6];
 
 float outData;
 long replyData;
-
-double radius;
-double zaber[2] = {0, 0};
 
 const unsigned long offsetX = 2148185;    //tracking the starting and current absolute positions of the stages
 const unsigned long offsetY = 2104209;
@@ -84,17 +89,15 @@ int reset = 0;        // akin to toggling device power
 
 String comm;
 
-//Period of feedback iterations
-const int interval = 5000;
-
-unsigned long previousMillis = 0;
-unsigned long currentMillis = 0;
+//////////////////////////////////// OBJECT DECLARATIONS ////////////////////////////////////////////////////////////
 
 //Create an object for the 6DOF IMU
 LSM303C imu;
 
 // Create a software serial port to communicate with the Zaber stages
 SoftwareSerial rs232(rsRX, rsTX);   
+
+////////////////////////////////// CODE ////////////////////////////////////////////////////////////////////////////
 
 void setup() 
 {
@@ -112,9 +115,11 @@ void setup()
   }
   */
 
+  /*
   // Enable external interrupt on pin specified by interrupt1 in order to find panel pitch
   pinMode(interrupt1, INPUT_PULLUP);
   attachInterrupt(digitalPinToInterrupt(interrupt1), findPitch, FALLING);
+  */
   
   // Sets the stages to use binary protocol
   rs232.begin(115200);
@@ -181,6 +186,12 @@ void loop()
     radius = interp1(sin(coordP.ze));
     zaber[0] = (-1) * radius * sin(coordP.az);
     zaber[1] = (-1) * radius * cos(coordP.az);
+
+    posX = mm(zaber[0]) + offsetX;
+    posY = mm(zaber[1]) + offsetY;
+
+    replyData = sendCommand(axisX, moveAbs, posX);
+    replyData = sendCommand(axisY, moveAbs, posY);  
     
     Serial.print("Azimuth: ");
     Serial.print(azimuth);
@@ -190,14 +201,17 @@ void loop()
     Serial.print(coordP.az * (180/PI));
     Serial.print("\tZenith*: ");
     Serial.print(coordP.ze * (180/PI));
-    Serial.print("\tX: ");
+    Serial.print("\tX(mm): ");
     Serial.print(zaber[0]);
-    Serial.print("\tY: ");
-    Serial.println(zaber[1]);
-    posX = sendCommand(axisX, moveAbs, mm(zaber[0]) + offsetX);
-    posY = sendCommand(axisY, moveAbs, mm(zaber[1]) + offsetY);    
+    Serial.print("\tY(mm): ");
+    Serial.print(zaber[1]);
+    Serial.print("\tX(usteps): ");
+    Serial.print(posX);
+    Serial.print("\tY(usteps): ");
+    Serial.println(posY);  
   }
 
+  /*
   if(setPitch == true)
   {
     accelX = 0;
@@ -221,12 +235,15 @@ void loop()
     
     setPitch = false;
   }
+  */
 }
 
+/*
 void findPitch()
 {
   setPitch = true;
 }
+*/
 
 long sendCommand(int device, int com, long data)
 {
