@@ -65,7 +65,7 @@ byte reply[6];
 float outData;
 long replyData;
 
-const unsigned long offsetX = 2148185;    //tracking the starting and current absolute positions of the stages
+const unsigned long offsetX = 2111065;    //tracking the starting and current absolute positions of the stages
 const unsigned long offsetY = 2104209;
 
 unsigned long posX = 0;
@@ -183,7 +183,7 @@ void loop()
     }
     
     //  Determining zaber stage coordinates   
-    radius = interp1(sin(coordP.ze));
+    radius = interp(sin(coordP.ze));
     zaber[0] = (-1) * radius * sin(coordP.az);
     zaber[1] = (-1) * radius * cos(coordP.az);
 
