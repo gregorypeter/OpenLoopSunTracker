@@ -1,6 +1,6 @@
 /*   CPV Feed-forward tracking
  *    Using Zaber Binary protocol
- *    Using f20 lens data
+ *    Using new lens data
  *   
  *   Michael Lipski
  *   AOPL
@@ -24,12 +24,29 @@
 
 #include <SoftwareSerial.h>
 
-// GPS uses software serial by default, with RX = pin 2 and TX = pin 3.  Mega 2560 does not support software serial RX on pin 2, so add a jumper wire from pin 2 on GPS shield to RX pin used
-const int RXPin = 2;
-const int TXPin = 3;
-const int rsRX = 4;
-const int rsTX = 5;
+///////////////////////// OPEN-LOOP TRACKING VARIABLES /////////////////////////////////////////
 
+// Enter array tilt and heading //
+double heading = 180 * (PI/180);
+double tilt = 0 * (PI/180);
+
+// NREL solar position calculation variables
+sunpos SunPos;
+polar coord; // zenith and azimuth in a struct
+polar coordP;
+vector cart;
+vector cartP;
+
+// Baud rate for GPS module
+int GPSBaud = 4800;
+
+// Period of feedback iterations
+const int interval = 5000;
+
+unsigned long previousMillis = 0;
+unsigned long currentMillis = 0;
+
+/*
 // Variables involved in finding the panel pitch from 3-axis accelerometer readings
 const byte interrupt1 = 2;     // Uno can support external interrupts on pins 2 and 3
 volatile boolean setPitch = false;   // boolean for setting panel tilt by reading accelerometer data; off by default
@@ -39,19 +56,9 @@ int averaging = 100;
 double accelX;
 double accelY;
 double accelZ;
+*/
 
-// Variables for solar position calculations
-sunpos SunPos;
-polar coord; // zenith and azimuth in a struct
-polar coordP;
-vector cart;
-vector cartP;
-
-// Enter array tilt and heading
-double heading = 180 * (PI/180);
-double tilt = 0 * (PI/180);
-
-// Variables for Zaber binary communication
+//////////////////////// ZABER STAGE VARIABLES ///////////////////////////////////////////////////////////
 byte command[6];
 byte reply[6];
 
@@ -83,19 +90,22 @@ int returnPos = 17;   // returns the value (in microsteps) of the position store
 int move2Pos = 18;    // move to the position stored in the indicated register
 int reset = 0;        // akin to toggling device power
 
-// Period of feedback iterations
-const int interval = 5000;
+///////////////////////////// PIN DECLARATIONS ///////////////////////////////////////////////////////
 
-unsigned long previousMillis = 0;
-unsigned long currentMillis = 0;
+// GPS uses software serial by default, with RX = pin 2 and TX = pin 3.  Mega 2560 does not support 
+// software serial RX on pin 2, so add a jumper wire from pin 2 on GPS shield to RX pin used
+const int RXPin = 10;
+const int TXPin = 3;
+const int rsRX = 11;
+const int rsTX = 5;
 
-int GPSBaud = 4800;
+//////////////////////////// OBJECT DECLARATIONS /////////////////////////////////////////////////
 
 // Create a TinyGPS++ object called "gps"
 TinyGPSPlus gps;
 
 //Create an object for the 6DOF IMU
-LSM303C imu;
+//LSM303C imu;
 
 // Create a software serial port called "gpsSerial"
 SoftwareSerial gpsSerial(RXPin, TXPin);  
@@ -103,14 +113,16 @@ SoftwareSerial gpsSerial(RXPin, TXPin);
 // Create a software serial port to communicate with the Zaber stages
 SoftwareSerial rs232(rsRX, rsTX);   
 
+////////////////////////////// CODE ///////////////////////////////////////////////////////////////
+
 void setup() 
 {
   // Start the Arduino hardware serial port at 9600 baud
   Serial.begin(9600);
 
   // Enable external interrupt on pin specified by interrupt1 in order to find panel pitch
-  pinMode(interrupt1, INPUT_PULLUP);
-  attachInterrupt(digitalPinToInterrupt(interrupt1), findPitch, FALLING);
+  //pinMode(interrupt1, INPUT_PULLUP);
+  //attachInterrupt(digitalPinToInterrupt(interrupt1), findPitch, FALLING);
 
   // Start the software serial port at the GPS's default baud
   gpsSerial.begin(GPSBaud);
@@ -188,7 +200,7 @@ void loop()
         //  Determining zaber stage coordinates
         if((coordP.ze < 90) && (coordP.ze > 0))
         {
-          radius = interp1(sin(coordP.ze));
+          radius = interp(sin(coordP.ze));
           zaber[0] = (-1) * radius * sin(coordP.az);
           zaber[1] = (-1) * radius * cos(coordP.az);
         }
@@ -198,6 +210,7 @@ void loop()
     }
   } 
 
+  /*
   if(setPitch == true)
   {
     accelX = 0;
@@ -221,12 +234,15 @@ void loop()
     
     setPitch = false;
   }
+  */
 }
 
+/*
 void findPitch()
 {
   setPitch = true;
 }
+*/
 
 long sendCommand(int device, int com, long data)
 {
