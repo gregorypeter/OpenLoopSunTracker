@@ -11,11 +11,14 @@
 
 #include <TinyGPS++.h>
 
-#include <LiquidCrystal.h>
+#include <Wire.h>
+#include "RTClib.h"
+#include <Adafruit_RGBLCDShield.h>
+#include <utility/Adafruit_MCP23017.h>
 
 int GPSBaud = 4800;
 
-int RXPin = 2;
+int RXPin = 10;
 int TXPin = 3;
 
 // Create a TinyGPS++ object called "gps"
@@ -24,12 +27,13 @@ TinyGPSPlus gps;
 // Create a software serial port called "gpsSerial"
 SoftwareSerial gpsSerial(RXPin, TXPin);  
 
-LiquidCrystal lcd(8, 9, 10, 11, 12, 13);      // (RS, enable, D4, D5, D6, D7)
+Adafruit_RGBLCDShield lcd = Adafruit_RGBLCDShield();
 
 void setup()
 {
   // begin communication with LCD
   lcd.begin(16, 2);     // (columns, rows)
+  lcd.setBacklight(0x5);
 
   // Start the software serial port at the GPS's default baud
   gpsSerial.begin(GPSBaud);
