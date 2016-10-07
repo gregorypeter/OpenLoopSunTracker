@@ -37,7 +37,6 @@ void setup()
 
   // Start the software serial port at the GPS's default baud
   gpsSerial.begin(GPSBaud);
-
 }
 
 void loop() 

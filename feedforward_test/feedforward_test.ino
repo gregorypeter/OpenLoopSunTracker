@@ -1,4 +1,4 @@
-/*   CPV Feed-forward tracking
+/*   CPV Feed-forward tracking - Outdoor test sketch
  *    Using Zaber Binary protocol
  *    Using new lens data
  *   
@@ -19,11 +19,16 @@
 
 #include <SoftwareSerial.h>
 
+#include <Wire.h>
+
+#include <Adafruit_RGBLCDShield.h>
+#include <utility/Adafruit_MCP23017.h>
+
 ///////////////////////// OPEN-LOOP TRACKING VARIABLES /////////////////////////////////////////
 
 // Enter array tilt and heading //
 double heading = 180 * (PI/180);
-double tilt = 0 * (PI/180);
+double tilt = 41 * (PI/180);
 
 // NREL solar position calculation variables
 sunpos SunPos;
@@ -57,7 +62,6 @@ double accelZ;
 byte command[6];
 byte reply[6];
 
-float outData;
 long replyData;
 
 double radius;    
@@ -103,6 +107,9 @@ const int rsTX = 5;
 // Create a TinyGPS++ object called "gps"
 TinyGPSPlus gps;
 
+// Adafruit RGB LCD Shield
+Adafruit_RGBLCDShield lcd = Adafruit_RGBLCDShield();
+
 //Create an object for the 6DOF IMU
 //LSM303C imu;
 
@@ -125,6 +132,10 @@ void setup()
 
   // Start the software serial port at the GPS's default baud
   gpsSerial.begin(GPSBaud);
+
+  // Begin communication with LCD
+  lcd.begin(16, 2);     // (columns, rows)
+  lcd.setBacklight(0x5);
   
   // Sets the stages to use binary protocol
   rs232.begin(115200);
@@ -136,7 +147,7 @@ void setup()
   rs232.end();
   delay(200);
 
-  //Start software serial connection with Zaber stages
+  // Start software serial connection with Zaber stages
   rs232.begin(9600);
   delay(2000);
   replyData = sendCommand(0, 42, 34402);       // Set speed to 1 mm/s
@@ -151,20 +162,30 @@ void loop()
     {
       posX = sendCommand(axisX, getPos, 0);
       posY = sendCommand(axisY, getPos, 0);
+      Serial.print("X: ");
       Serial.print(posX);
-      Serial.print('\t');
+      Serial.print("\tY: ");
       Serial.println(posY);
     }
     else if(serialComm == "getcoords")
     {
+      Serial.print("Az: ");
+      Serial.print(coord.az * 180/PI);
+      Serial.print("\tZe: ");
+      Serial.print(coord.ze * 180/PI);
+      Serial.print("\tAz*: ");
+      Serial.print(coordP.az * 180/PI);
+      Serial.print("\tZe*: ");
+      Serial.print(coordP.ze * 180/PI);
+      Serial.print("\tX: ");
       Serial.print(mm(zaber[0]) + offsetX);
-      Serial.print('\t');
+      Serial.print("\tY: ");
       Serial.println(mm(zaber[1]) + offsetY);
     }
     else if(serialComm == "goto")
     {
-      posX = sendCommand(axisX, moveAbs, mm(zaber[0]) + offsetX);
-      posY = sendCommand(axisY, moveAbs, mm(zaber[1]) + offsetY);
+      replyData = sendCommand(axisX, moveAbs, mm(zaber[0]) + offsetX);
+      replyData = sendCommand(axisY, moveAbs, mm(zaber[1]) + offsetY);
     }
   }
     
@@ -212,7 +233,23 @@ void loop()
           radius = interp(sin(coordP.ze));
           zaber[0] = (-1) * radius * sin(coordP.az);
           zaber[1] = (-1) * radius * cos(coordP.az);
-        }        
+        }   
+
+        lcd.clear();
+        lcd.setCursor(0, 0);
+        lcd.print(gps.date.month());
+        lcd.print('/');
+        lcd.print(gps.date.day());
+        lcd.print('/');
+        lcd.print(gps.date.year());
+        lcd.print(' ');
+        lcd.print(gps.time.hour());
+        lcd.print(':');
+        lcd.print(gps.time.minute());
+        lcd.setCursor(0, 1);
+        lcd.print(gps.location.lat());
+        lcd.setCursor(8, 1);
+        lcd.print(gps.location.lng());
       }
     }
 }
