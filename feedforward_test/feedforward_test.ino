@@ -21,8 +21,8 @@
 
 #include <Wire.h>
 
-#include <Adafruit_RGBLCDShield.h>
-#include <utility/Adafruit_MCP23017.h>
+//#include <Adafruit_RGBLCDShield.h>
+//#include <utility/Adafruit_MCP23017.h>
 
 ///////////////////////// OPEN-LOOP TRACKING VARIABLES /////////////////////////////////////////
 
@@ -73,6 +73,9 @@ const unsigned long offsetY = 2104209;
 unsigned long posX = 0;
 unsigned long posY = 0;
 
+float posXum = 0;
+float posYum = 0;
+
 int axisX = 1;
 int axisY = 2;
 
@@ -96,10 +99,10 @@ String serialComm;
 // GPS uses software serial by default, with RX = pin 2 and TX = pin 3.  Mega 2560 does not support 
 // software serial RX on pin 2, so add a jumper wire from pin 2 on GPS shield to RX pin used
 
-const int RXPin = 10;   // GPS pins
+const int RXPin = 2;   // GPS pins
 const int TXPin = 3;
 
-const int rsRX = 11;    // RS-232 shield pins
+const int rsRX = 4;    // RS-232 shield pins
 const int rsTX = 5;
 
 //////////////////////////// OBJECT DECLARATIONS /////////////////////////////////////////////////
@@ -108,7 +111,7 @@ const int rsTX = 5;
 TinyGPSPlus gps;
 
 // Adafruit RGB LCD Shield
-Adafruit_RGBLCDShield lcd = Adafruit_RGBLCDShield();
+//Adafruit_RGBLCDShield lcd = Adafruit_RGBLCDShield();
 
 //Create an object for the 6DOF IMU
 //LSM303C imu;
@@ -131,11 +134,11 @@ void setup()
   //attachInterrupt(digitalPinToInterrupt(interrupt1), findPitch, FALLING);
 
   // Start the software serial port at the GPS's default baud
-  gpsSerial.begin(GPSBaud);
+  //gpsSerial.begin(GPSBaud);
 
   // Begin communication with LCD
-  lcd.begin(16, 2);     // (columns, rows)
-  lcd.setBacklight(0x5);
+  //lcd.begin(16, 2);     // (columns, rows)
+  //lcd.setBacklight(0x5);
   
   // Sets the stages to use binary protocol
   rs232.begin(115200);
@@ -161,11 +164,20 @@ void loop()
     if(serialComm == "getpos")
     {
       posX = sendCommand(axisX, getPos, 0);
+      posXum = (posX - offsetX) * umResolution;
+      
       posY = sendCommand(axisY, getPos, 0);
+      posYum = (posY - offsetY) * umResolution;
+      
       Serial.print("X: ");
-      Serial.print(posX);
-      Serial.print("\tY: ");
-      Serial.println(posY);
+      Serial.print(posX - offsetX);
+      Serial.print(" uSteps, ");
+      Serial.print (posXum);   
+      Serial.print(" um \tY: ");
+      Serial.print(posY - offsetY);
+      Serial.print(" uSteps, ");
+      Serial.print(posYum);
+      Serial.println(" um");
     }
     else if(serialComm == "getcoords")
     {
@@ -178,9 +190,14 @@ void loop()
       Serial.print("\tZe*: ");
       Serial.print(coordP.ze * 180/PI);
       Serial.print("\tX: ");
-      Serial.print(mm(zaber[0]) + offsetX);
-      Serial.print("\tY: ");
-      Serial.println(mm(zaber[1]) + offsetY);
+      Serial.print(mm(zaber[0]));
+      Serial.print(" uSteps, ");
+      Serial.print(zaber[0] * 1000);      
+      Serial.print(" um \tY: ");
+      Serial.print(mm(zaber[1]));
+      Serial.print(" uSteps, ");
+      Serial.print(zaber[1] * 1000);
+      Serial.println(" um");
     }
     else if(serialComm == "goto")
     {
@@ -235,6 +252,7 @@ void loop()
           zaber[1] = (-1) * radius * cos(coordP.az);
         }   
 
+        /*
         lcd.clear();
         lcd.setCursor(0, 0);
         lcd.print(gps.date.month());
@@ -250,6 +268,7 @@ void loop()
         lcd.print(gps.location.lat());
         lcd.setCursor(8, 1);
         lcd.print(gps.location.lng());
+        */
       }
     }
 }

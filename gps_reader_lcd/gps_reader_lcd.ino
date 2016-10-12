@@ -18,7 +18,7 @@
 
 int GPSBaud = 4800;
 
-int RXPin = 10;
+int RXPin = 2;
 int TXPin = 3;
 
 // Create a TinyGPS++ object called "gps"
