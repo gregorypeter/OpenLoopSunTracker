@@ -158,136 +158,135 @@ void setup()
 
 void loop()
 {
-  if(Serial.available() > 0)
+  while (gpsSerial.available() > 0)
   {
-    serialComm = Serial.readStringUntil('\n');
-    if(serialComm == "getpos")
+    if(gps.encode(gpsSerial.read()))
     {
-      posX = sendCommand(axisX, getPos, 0);
-      posXum = (posX - offsetX) * umResolution;
-      
-      posY = sendCommand(axisY, getPos, 0);
-      posYum = (posY - offsetY) * umResolution;
-      
-      Serial.print("X: ");
-      Serial.print(posX - offsetX);
-      Serial.print(" uSteps, ");
-      Serial.print (posXum);   
-      Serial.print(" um \tY: ");
-      Serial.print(posY - offsetY);
-      Serial.print(" uSteps, ");
-      Serial.print(posYum);
-      Serial.println(" um");
-    }
-    else if(serialComm == "gettime")
-    {
-      if(gps.encode(gpsSerial.read()))
-      {
-        Serial.print(gps.date.month());
-        Serial.print('/');
-        Serial.print(gps.date.day());
-        Serial.print('/');
-        Serial.print(gps.date.year());
-        Serial.print('\t');
-        Serial.print(gps.time.hour());
-        Serial.print(':');
-        Serial.print(gps.time.minute());
-        Serial.print(':');
-        Serial.println(gps.time.second());
-      M}
-    }
-    else if(serialComm == "getcoords")
-    {
-      Serial.print("Az: ");
-      Serial.print(coord.az * 180/PI);
-      Serial.print("\tZe: ");
-      Serial.print(coord.ze * 180/PI);
-      Serial.print("\tAz*: ");
-      Serial.print(coordP.az * 180/PI);
-      Serial.print("\tZe*: ");
-      Serial.print(coordP.ze * 180/PI);
-      Serial.print("\tX: ");
-      Serial.print(mm(zaber[0]));
-      Serial.print(" uSteps, ");
-      Serial.print(zaber[0] * 1000);      
-      Serial.print(" um \tY: ");
-      Serial.print(mm(zaber[1]));
-      Serial.print(" uSteps, ");
-      Serial.print(zaber[1] * 1000);
-      Serial.println(" um");
-    }
-    else if(serialComm == "goto")
-    {
-      replyData = sendCommand(axisX, moveAbs, mm(zaber[0]) + offsetX);
-      replyData = sendCommand(axisY, moveAbs, mm(zaber[1]) + offsetY);
-    }
-  }
-    
-    if (gpsSerial.available() > 0)
-    {
-      if(gps.encode(gpsSerial.read()))
-      {
-        SunPos.UT = gps.time.hour() + double(gps.time.minute())/60.0 + double(gps.time.second())/3600.0 + double(gps.time.centisecond())/360000; // UT in hours [decimal]
-        SunPos.Day = gps.date.day(); // day [integer]
-        SunPos.Month = gps.date.month(); // month [integer]
-        SunPos.Year = gps.date.year(); // year [integer]
-        SunPos.Dt = 96.4 + 0.567*double(gps.date.year()-2061); // Terrestial time - UT
-        SunPos.Longitude = gps.location.lng() * (2*PI/360.0); // State College Longitude and Latitude [radians]      
-        SunPos.Latitude = gps.location.lat() * (2*PI/360.0);
-        SunPos.Pressure = 1.0; // Pressure [atm]
-        //SunPos.Temperature = imu.readTempC(); // Temperature [C], pulled from LSM303C 6DOF sensor     
-        SunPos.Temperature = 20.0;
+      // Grab data from GPS for algorithm variables
+      SunPos.UT = gps.time.hour() + double(gps.time.minute())/60.0 + double(gps.time.second())/3600.0 + double(gps.time.centisecond())/360000; // UT in hours [decimal]
+      SunPos.Day = gps.date.day(); // day [integer]
+      SunPos.Month = gps.date.month(); // month [integer]
+      SunPos.Year = gps.date.year(); // year [integer]
+      SunPos.Dt = 96.4 + 0.567*double(gps.date.year()-2061); // Terrestial time - UT
+      SunPos.Longitude = gps.location.lng() * (2*PI/360.0); // State College Longitude and Latitude [radians]      
+      SunPos.Latitude = gps.location.lat() * (2*PI/360.0);
+      SunPos.Pressure = 1.0; // Pressure [atm]
+      //SunPos.Temperature = imu.readTempC(); // Temperature [C], pulled from LSM303C 6DOF sensor     
+      SunPos.Temperature = 20.0;
         
-        SunPos.Algorithm5();
+      SunPos.Algorithm5();
   
-        coord.ze = SunPos.Zenith;
-        coord.az = SunPos.Azimuth + PI;
+      coord.ze = SunPos.Zenith;
+      coord.az = SunPos.Azimuth + PI;
   
-        //  Finding solar coordinates w.r.t. panel normal
-        cart = sph2rect(coord);
+      //  Finding solar coordinates w.r.t. panel normal
+      cart = sph2rect(coord);
 
-        cartP.x = (cos(heading) * cart.x) - (sin(heading) * cos(tilt) * cart.y) - (sin(heading) * sin(tilt) * cart.z);
-        cartP.y = (1)*(sin(heading) * cart.x) + (cos(heading) * cos(tilt) * cart.y) + (cos(heading) * sin(tilt) * cart.z);
-        cartP.z = (cos(tilt) * cart.z) - (sin(tilt) * cart.y);
+      cartP.x = (cos(heading) * cart.x) - (sin(heading) * cos(tilt) * cart.y) - (sin(heading) * sin(tilt) * cart.z);
+      cartP.y = (1)*(sin(heading) * cart.x) + (cos(heading) * cos(tilt) * cart.y) + (cos(heading) * sin(tilt) * cart.z);
+      cartP.z = (cos(tilt) * cart.z) - (sin(tilt) * cart.y);
 
-        coordP = rect2sph(cartP);
+      coordP = rect2sph(cartP);
   
-        if(coordP.az < 0)
+      if(coordP.az < 0)
+      {
+        coordP.az += (2*PI);
+      }
+      else if(coordP.az > (2*PI))
+      {
+        coordP.az -= (2*PI);
+      }      
+  
+      //  Determining zaber stage coordinates
+      if((coordP.ze < 90) && (coordP.ze > 0))
+      {
+        radius = interp(sin(coordP.ze));
+        zaber[0] = (-1) * radius * sin(coordP.az);
+        zaber[1] = (-1) * radius * cos(coordP.az);
+      }   
+
+      /*
+      lcd.clear();
+      lcd.setCursor(0, 0);
+      lcd.print(gps.date.month());
+      lcd.print('/');
+      lcd.print(gps.date.day());
+      lcd.print('/');
+      lcd.print(gps.date.year());
+      lcd.print(' ');
+      lcd.print(gps.time.hour());
+      lcd.print(':');
+      lcd.print(gps.time.minute());
+      lcd.setCursor(0, 1);
+      lcd.print(gps.location.lat());
+      lcd.setCursor(8, 1);
+      lcd.print(gps.location.lng());
+      */
+
+      // Serial commands
+      if(Serial.available() > 0)
+      {
+        serialComm = Serial.readStringUntil('\n');
+        if(serialComm == "getpos")
         {
-          coordP.az += (2*PI);
+          posX = sendCommand(axisX, getPos, 0);
+          posXum = (posX - offsetX) * umResolution;
+          
+          posY = sendCommand(axisY, getPos, 0);
+          posYum = (posY - offsetY) * umResolution;
+          
+          Serial.print("X: ");
+          Serial.print(posX - offsetX);
+          Serial.print(" uSteps, ");
+          Serial.print (posXum);   
+          Serial.print(" um \tY: ");
+          Serial.print(posY - offsetY);
+          Serial.print(" uSteps, ");
+          Serial.print(posYum);
+          Serial.println(" um");
         }
-        else if(coordP.az > (2*PI))
+        else if(serialComm == "gettime")
+        {        
+          Serial.print(gps.date.month());
+          Serial.print('/');
+          Serial.print(gps.date.day());
+          Serial.print('/');
+          Serial.print(gps.date.year());
+          Serial.print('\t');
+          Serial.print(gps.time.hour());
+          Serial.print(':');
+          Serial.print(gps.time.minute());
+          Serial.print(':');
+          Serial.println(gps.time.second());        
+        }
+        else if(serialComm == "getcoords")
         {
-          coordP.az -= (2*PI);
-        }      
-  
-        //  Determining zaber stage coordinates
-        if((coordP.ze < 90) && (coordP.ze > 0))
+          Serial.print("Az: ");
+          Serial.print(coord.az * 180/PI);
+          Serial.print("\tZe: ");
+          Serial.print(coord.ze * 180/PI);
+          Serial.print("\tAz*: ");
+          Serial.print(coordP.az * 180/PI);
+          Serial.print("\tZe*: ");
+          Serial.print(coordP.ze * 180/PI);
+          Serial.print("\tX: ");
+          Serial.print(mm(zaber[0]));
+          Serial.print(" uSteps, ");
+          Serial.print(zaber[0] * 1000);      
+          Serial.print(" um \tY: ");
+          Serial.print(mm(zaber[1]));
+          Serial.print(" uSteps, ");
+          Serial.print(zaber[1] * 1000);
+          Serial.println(" um");
+        }
+        else if(serialComm == "goto")
         {
-          radius = interp(sin(coordP.ze));
-          zaber[0] = (-1) * radius * sin(coordP.az);
-          zaber[1] = (-1) * radius * cos(coordP.az);
-        }   
-
-        /*
-        lcd.clear();
-        lcd.setCursor(0, 0);
-        lcd.print(gps.date.month());
-        lcd.print('/');
-        lcd.print(gps.date.day());
-        lcd.print('/');
-        lcd.print(gps.date.year());
-        lcd.print(' ');
-        lcd.print(gps.time.hour());
-        lcd.print(':');
-        lcd.print(gps.time.minute());
-        lcd.setCursor(0, 1);
-        lcd.print(gps.location.lat());
-        lcd.setCursor(8, 1);
-        lcd.print(gps.location.lng());
-        */
+          replyData = sendCommand(axisX, moveAbs, mm(zaber[0]) + offsetX);
+          replyData = sendCommand(axisY, moveAbs, mm(zaber[1]) + offsetY);
+        }
       }
     }
+  }    
 }
 
 long sendCommand(int device, int com, long data)
