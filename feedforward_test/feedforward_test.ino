@@ -134,7 +134,7 @@ void setup()
   //attachInterrupt(digitalPinToInterrupt(interrupt1), findPitch, FALLING);
 
   // Start the software serial port at the GPS's default baud
-  //gpsSerial.begin(GPSBaud);
+  gpsSerial.begin(GPSBaud);
 
   // Begin communication with LCD
   //lcd.begin(16, 2);     // (columns, rows)
@@ -178,6 +178,23 @@ void loop()
       Serial.print(" uSteps, ");
       Serial.print(posYum);
       Serial.println(" um");
+    }
+    else if(serialComm == "gettime")
+    {
+      if(gps.encode(gpsSerial.read()))
+      {
+        Serial.print(gps.date.month());
+        Serial.print('/');
+        Serial.print(gps.date.day());
+        Serial.print('/');
+        Serial.print(gps.date.year());
+        Serial.print('\t');
+        Serial.print(gps.time.hour());
+        Serial.print(':');
+        Serial.print(gps.time.minute());
+        Serial.print(':');
+        Serial.println(gps.time.second());
+      M}
     }
     else if(serialComm == "getcoords")
     {
