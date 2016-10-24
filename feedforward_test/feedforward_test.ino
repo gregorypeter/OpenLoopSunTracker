@@ -182,8 +182,8 @@ void loop()
       //  Finding solar coordinates w.r.t. panel normal
       cart = sph2rect(coord);
 
-      cartP.x = (cos(heading) * cart.x) - (sin(heading) * cos(tilt) * cart.y) - (sin(heading) * sin(tilt) * cart.z);
-      cartP.y = (1)*(sin(heading) * cart.x) + (cos(heading) * cos(tilt) * cart.y) + (cos(heading) * sin(tilt) * cart.z);
+      cartP.x = (cos(heading) * cart.x) + (sin(heading) * cos(tilt) * cart.y) + (sin(heading) * sin(tilt) * cart.z);
+      cartP.y = (-1)*(sin(heading) * cart.x) + (cos(heading) * cos(tilt) * cart.y) + (cos(heading) * sin(tilt) * cart.z);
       cartP.z = (cos(tilt) * cart.z) - (sin(tilt) * cart.y);
 
       coordP = rect2sph(cartP);
@@ -286,7 +286,15 @@ void loop()
         }
       }
     }
-  }    
+  } 
+
+  // If 5000 milliseconds pass and there are no characters coming in
+  // over the software serial port, show a "No GPS detected" error
+  if (millis() > 5000 && gps.charsProcessed() < 10)
+  {
+    Serial.println(F("No GPS detected"));
+    while(true);
+  }
 }
 
 long sendCommand(int device, int com, long data)
