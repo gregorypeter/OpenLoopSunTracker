@@ -12,7 +12,7 @@
 
 #include <zaberx.h>
 
-#include <TinyGPS++.h>
+#include "RTClib.h"
 
 #include <Sun_position_algorithms.h>
 #include <translate.h>
@@ -28,7 +28,7 @@
 
 // Enter array tilt and heading //
 double heading = 0 * (PI/180);
-double tilt = 41 * (PI/180);
+double tilt = 0 * (PI/180);
 
 // NREL solar position calculation variables
 sunpos SunPos;
@@ -37,8 +37,9 @@ polar coordP;
 vector cart;
 vector cartP;
 
-// Baud rate for GPS module
-int GPSBaud = 4800;
+int offsetUTC = 4;  // number of hours local time is behind UTC
+
+char daysOfTheWeek[7][12] = {"Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"};
 
 // Period of feedback iterations
 const int interval = 5000;
@@ -107,17 +108,13 @@ const int rsTX = 5;
 
 //////////////////////////// OBJECT DECLARATIONS /////////////////////////////////////////////////
 
-// Create a TinyGPS++ object called "gps"
-TinyGPSPlus gps;
+RTC_DS1307 rtc;
 
 // Adafruit RGB LCD Shield
 //Adafruit_RGBLCDShield lcd = Adafruit_RGBLCDShield();
 
 //Create an object for the 6DOF IMU
 //LSM303C imu;
-
-// Create a software serial port called "gpsSerial"
-SoftwareSerial gpsSerial(RXPin, TXPin);  
 
 // Create a software serial port to communicate with the Zaber stages
 SoftwareSerial rs232(rsRX, rsTX);   
@@ -127,14 +124,17 @@ SoftwareSerial rs232(rsRX, rsTX);
 void setup() 
 {
   // Start the Arduino hardware serial port at 9600 baud
-  Serial.begin(9600);
+  Serial.begin(57600);
+
+  if (! rtc.begin())
+  {
+    Serial.println("Couldn't find RTC");
+    while (1);
+  }
 
   // Enable external interrupt on pin specified by interrupt1 in order to find panel pitch
   //pinMode(interrupt1, INPUT_PULLUP);
   //attachInterrupt(digitalPinToInterrupt(interrupt1), findPitch, FALLING);
-
-  // Start the software serial port at the GPS's default baud
-  gpsSerial.begin(GPSBaud);
 
   // Begin communication with LCD
   //lcd.begin(16, 2);     // (columns, rows)
@@ -158,18 +158,16 @@ void setup()
 
 void loop()
 {
-  while (gpsSerial.available() > 0)
-  {
-    if(gps.encode(gpsSerial.read()))
-    {
-      // Grab data from GPS for algorithm variables
-      SunPos.UT = gps.time.hour() + double(gps.time.minute())/60.0 + double(gps.time.second())/3600.0 + double(gps.time.centisecond())/360000; // UT in hours [decimal]
-      SunPos.Day = gps.date.day(); // day [integer]
-      SunPos.Month = gps.date.month(); // month [integer]
-      SunPos.Year = gps.date.year(); // year [integer]
-      SunPos.Dt = 96.4 + 0.567*double(gps.date.year()-2061); // Terrestial time - UT
-      SunPos.Longitude = gps.location.lng() * (2*PI/360.0); // State College Longitude and Latitude [radians]      
-      SunPos.Latitude = gps.location.lat() * (2*PI/360.0);
+  DateTime now = rtc.now();
+    
+ // Grab data from GPS for algorithm variables
+      SunPos.UT = offsetUTC + now.hour() + double(now.minute())/60.0 + double(now.second())/3600.0; // UT in hours [decimal]
+      SunPos.Day = now.day(); // day [integer]
+      SunPos.Month = now.month(); // month [integer]
+      SunPos.Year = now.year(); // year [integer]
+      SunPos.Dt = 96.4 + 0.567*double(now.year()-2061); // Terrestial time - UT
+      SunPos.Longitude = -77.8647 * (2*PI/360.0); // State College Longitude and Latitude [radians]      
+      SunPos.Latitude = 40.7946 * (2*PI/360.0);
       SunPos.Pressure = 1.0; // Pressure [atm]
       //SunPos.Temperature = imu.readTempC(); // Temperature [C], pulled from LSM303C 6DOF sensor     
       SunPos.Temperature = 20.0;
@@ -246,8 +244,18 @@ void loop()
           Serial.println(" um");
         }
         else if(serialComm == "gettime")
-        {        
-          displayInfo();     
+        {             
+          Serial.print(now.month());
+          Serial.print('/');
+          Serial.print(now.day());
+          Serial.print('/');
+          Serial.print(now.year());
+          Serial.print('\t');
+          Serial.print(now.hour());
+          Serial.print(':');
+          Serial.print(now.minute());
+          Serial.print(':');
+          Serial.println(now.second());         
         }
         else if(serialComm == "getcoords")
         {
@@ -275,18 +283,6 @@ void loop()
           replyData = sendCommand(axisY, moveAbs, mm(zaber[1]) + offsetY);
         }
       }
-    }
-  } 
-
-/*
-  // If 5000 milliseconds pass and there are no characters coming in
-  // over the software serial port, show a "No GPS detected" error
-  if (millis() > 5000 && gps.charsProcessed() < 10)
-  {
-    Serial.println(F("No GPS detected"));
-    while(true);
-  }
-  */
 }
 
 long sendCommand(int device, int com, long data)
@@ -368,55 +364,4 @@ long sendCommand(int device, int com, long data)
      Serial.println(repData);  
      return repData;
    }    
-}
-
-void displayInfo()
-{
-  Serial.print(F("Location: ")); 
-  if (gps.location.isValid())
-  {
-    Serial.print(gps.location.lat(), 6);
-    Serial.print(F(","));
-    Serial.print(gps.location.lng(), 6);
-  }
-  else
-  {
-    Serial.print(F("INVALID"));
-  }
-
-  Serial.print(F("  Date/Time: "));
-  if (gps.date.isValid())
-  {
-    Serial.print(gps.date.month());
-    Serial.print(F("/"));
-    Serial.print(gps.date.day());
-    Serial.print(F("/"));
-    Serial.print(gps.date.year());
-  }
-  else
-  {
-    Serial.print(F("INVALID"));
-  }
-
-  Serial.print(F(" "));
-  if (gps.time.isValid())
-  {
-    if (gps.time.hour() < 10) Serial.print(F("0"));
-    Serial.print(gps.time.hour());
-    Serial.print(F(":"));
-    if (gps.time.minute() < 10) Serial.print(F("0"));
-    Serial.print(gps.time.minute());
-    Serial.print(F(":"));
-    if (gps.time.second() < 10) Serial.print(F("0"));
-    Serial.print(gps.time.second());
-    Serial.print(F("."));
-    if (gps.time.centisecond() < 10) Serial.print(F("0"));
-    Serial.print(gps.time.centisecond());
-  }
-  else
-  {
-    Serial.print(F("INVALID"));
-  }
-
-  Serial.println();
 }
