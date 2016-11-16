@@ -27,7 +27,7 @@
 ///////////////////////// OPEN-LOOP TRACKING VARIABLES /////////////////////////////////////////
 
 // Enter array tilt and heading //
-double heading = 0 * (PI/180);
+double heading = 180 * (PI/180);
 double tilt = 0 * (PI/180);
 
 // NREL solar position calculation variables
@@ -68,11 +68,14 @@ long replyData;
 double radius;    
 double zaber[2] = {0, 0};   // [x,y] for the stages (in mm)
 
-const unsigned long offsetX = 2148185;    //tracking the starting and current absolute positions of the stages
-const unsigned long offsetY = 2104209;
+const unsigned long offsetX = 2119000;    //tracking the starting and current absolute positions of the stages
+const unsigned long offsetY = 2095000;
 
 unsigned long posX = 0;
 unsigned long posY = 0;
+
+long delX;
+long delY;
 
 float posXum = 0;
 float posYum = 0;
@@ -153,7 +156,7 @@ void setup()
   // Start software serial connection with Zaber stages
   rs232.begin(9600);
   delay(2000);
-  replyData = sendCommand(0, 42, 34402);       // Set speed to 1 mm/s
+  //replyData = sendCommand(0, 42, 34402);       // Set speed to 1 mm/s
 }
 
 void loop()
@@ -228,17 +231,23 @@ void loop()
         if(serialComm == "getpos")
         {
           posX = sendCommand(axisX, getPos, 0);
-          posXum = (posX - offsetX) * umResolution;
+          delX = posX - offsetX;
+          posXum = delX * umResolution;
           
           posY = sendCommand(axisY, getPos, 0);
-          posYum = (posY - offsetY) * umResolution;
+          delY = posY - offsetY;
+          posYum = delY * umResolution;
+
+          Serial.print(posX);
+          Serial.print('\t');
+          Serial.println(posY);
           
           Serial.print("X: ");
-          Serial.print(posX - offsetX);
+          Serial.print(delX);
           Serial.print(" uSteps, ");
           Serial.print (posXum);   
           Serial.print(" um \tY: ");
-          Serial.print(posY - offsetY);
+          Serial.print(delY);
           Serial.print(" uSteps, ");
           Serial.print(posYum);
           Serial.println(" um");
@@ -281,6 +290,11 @@ void loop()
         {
           replyData = sendCommand(axisX, moveAbs, mm(zaber[0]) + offsetX);
           replyData = sendCommand(axisY, moveAbs, mm(zaber[1]) + offsetY);
+        }
+        else if(serialComm = "origin")
+        {
+          replyData = sendCommand(axisX, moveAbs, offsetX);
+          replyData = sendCommand(axisY, moveAbs, offsetY);
         }
       }
 }
