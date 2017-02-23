@@ -12,29 +12,20 @@
 
 #include <zaberx.h>
 
-#include "RTClib.h"
-
-#include <Sun_position_algorithms.h>
 #include <translate.h>
 
 #include <SoftwareSerial.h>
 
-#include <Wire.h>
-
-//#include <Adafruit_RGBLCDShield.h>
-//#include <utility/Adafruit_MCP23017.h>
-
 ///////////////////////// OPEN-LOOP TRACKING VARIABLES /////////////////////////////////////////
 
 // Enter array tilt and heading //
-double heading = 180 * (PI/180);
+double heading = 270 * (PI/180);
 double tilt = 0 * (PI/180);
 
 double zenith = 0;
 double azimuth = 0;
 
 // NREL solar position calculation variables
-sunpos SunPos;
 polar coord; // zenith and azimuth in a struct
 polar coordP;
 vector cart;
@@ -61,8 +52,8 @@ long replyData;
 double radius;    
 double zaber[2] = {0, 0};   // [x,y] for the stages (in mm)
 
-const unsigned long offsetX = 2119000;    //tracking the starting and current absolute positions of the stages
-const unsigned long offsetY = 2095000;
+unsigned long offsetX = 2119000;    //tracking the starting and current absolute positions of the stages
+unsigned long offsetY = 2095000;
 
 unsigned long posX = 0;
 unsigned long posY = 0;
@@ -70,11 +61,13 @@ unsigned long posY = 0;
 long delX;
 long delY;
 
+float offsetZ = 90.0;
+
 float posXum = 0;
 float posYum = 0;
 
-int portA = 1;
-int portB = 2;
+int linear = 1;
+int rot = 2;
 
 int axisX = 1;
 int axisY = 2;
@@ -107,11 +100,6 @@ const int rsTXb = 5;
 
 //////////////////////////// OBJECT DECLARATIONS /////////////////////////////////////////////////
 
-RTC_DS1307 rtc;
-
-// Adafruit RGB LCD Shield
-//Adafruit_RGBLCDShield lcd = Adafruit_RGBLCDShield();
-
 //Create an object for the 6DOF IMU
 //LSM303C imu;
 
@@ -126,7 +114,7 @@ SoftwareSerial rs232b(rsRXb, rsTXb);
 void setup() 
 {
   // Start the Arduino hardware serial port at 9600 baud
-  Serial.begin(57600);
+  Serial.begin(9600);
 
   // Enable external interrupt on pin specified by interrupt1 in order to find panel pitch
   //pinMode(interrupt1, INPUT_PULLUP);
@@ -149,9 +137,10 @@ void setup()
   // Start software serial connection with Zaber stages
   rs232.begin(9600);
   rs232b.begin(9600);
-  delay(2000);
-  replyData = sendCommand(portA, 0, 42, 34402);       // Set speed to 1 mm/s
-  replyData = sendCommand(portB, 0, 42, 2276);        // Set speed to 5 deg/s 
+  delay(1000);
+  sendCommand(linear, 0, 42, 34402);       // Set speed to 1 mm/s
+  sendCommand(rot, 0, 42, 2276);        // Set speed to 5 deg/s 
+  Serial.println("Ready");
 }
 
 void loop()
@@ -164,11 +153,15 @@ void loop()
     {
       // Get zenith angle from user
       Serial.print("Enter zenith angle: ");
-      serialComm == Serial.readStringUntil('\n');
+      while(Serial.available() == 0)
+      {
+        delay(10);
+      }
+      serialComm = Serial.readStringUntil('\n');
       zenith = serialComm.toFloat();
 
       // Send zenith angle to rotational stage
-      sendCommand(portB, 0, moveAbs, stepsD(zenith));
+      sendCommand(rot, 0, moveAbs, stepsD(zenith + offsetZ));
       
       coord.az = azimuth * (PI/180);
       coord.ze = zenith * (PI/180);
@@ -192,17 +185,17 @@ void loop()
       }
     
       //  Determining zaber stage coordinates     
-      radius = interp2(sin(coordP.ze));
+      radius = interp(sin(coordP.ze));
       zaber[0] = (-1) * radius * sin(coordP.az);
       zaber[1] = (-1) * radius * cos(coordP.az);
     }
     if(serialComm == "getpos")
     {
-      posX = sendCommand(portA, axisX, getPos, 0);
+      posX = sendCommand(linear, axisX, getPos, 0);
       delX = posX - offsetX;
       posXum = delX * umResolution;
       
-      posY = sendCommand(portA, axisY, getPos, 0);
+      posY = sendCommand(linear, axisY, getPos, 0);
       delY = posY - offsetY;
       posYum = delY * umResolution;
 
@@ -242,13 +235,35 @@ void loop()
     }
     else if(serialComm == "goto")
     {
-      sendCommand(portA, axisX, moveAbs, mm(zaber[0]) + offsetX);
-      sendCommand(portA, axisY, moveAbs, mm(zaber[1]) + offsetY);
+      sendCommand(linear, axisX, moveAbs, mm(zaber[0]) + offsetX);
+      sendCommand(linear, axisY, moveAbs, mm(zaber[1]) + offsetY);
     }
-    else if(serialComm = "origin")
+    else if(serialComm == "origin")
     {
-      sendCommand(portA, axisX, moveAbs, offsetX);
-      sendCommand(portA, axisY, moveAbs, offsetY);
+      sendCommand(linear, axisX, moveAbs, offsetX);
+      sendCommand(linear, axisY, moveAbs, offsetY);
+    }
+    else if(serialComm == "xoffset")
+    {
+      Serial.println("Enter origin x coordinate:");
+      while(Serial.available() == 0)
+      {
+        delay(10);
+      }
+      serialComm = Serial.readStringUntil('\n');
+      offsetX = serialComm.toInt();
+      Serial.println("New origin x-coord confirmed");
+    }
+    else if(serialComm == "yoffset")
+    {
+      Serial.println("Enter origin y coordinate:");
+      while(Serial.available() == 0)
+      {
+        delay(10);
+      }
+      serialComm = Serial.readStringUntil('\n');
+      offsetY = serialComm.toInt();
+      Serial.println("New origin y-coord confirmed");
     }
   }
 }
@@ -302,7 +317,7 @@ long sendCommand(int port, int device, int com, long data)
      {
        rs232.readBytes(reply, 6);
      }
-   }
+   }   
    else if(port == 2)
    {
      // Clearing serial buffer

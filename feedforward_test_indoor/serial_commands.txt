@@ -1,0 +1,7 @@
+SERIAL COMMANDS
+
+"zenith" -> enter -> angle (in degrees)  : sets zenith angle and moves rotational stage
+"goto" : moves x-axis to where focal point should be
+"xoffset" -> enter -> offset x-axis (in microsteps) : sets new origin x-coordinate (DEFAULT = 2119000)
+"yoffset" -> enter -> offset y-axis (in microsteps) : sets new origin y-coordinate (DEFAULT = 2095000)
+"origin" : moves stages to origin
